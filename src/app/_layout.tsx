@@ -3,8 +3,12 @@ import { Stack } from 'expo-router';
 export default function RootLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      {/* Drejton te grupi i tab-eve ku ndodhen të 5 faqet dhe navbari i poshtëm */}
+      {/* Grupi i tab-eve kryesore me navbar (Ballina, Klientët, Profili) */}
       <Stack.Screen name="(tabs)" />
+      
+      {/* Ekranet e faturës dhe zërit që hapen pa navbar dhe me shigjetë lart */}
+      <Stack.Screen name="invoice" />
+      <Stack.Screen name="add-bill" />
     </Stack>
   );
 }
