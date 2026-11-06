@@ -8,6 +8,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="invoices" options={{ title: 'Faturat' }} />
       <Tabs.Screen name="customers" options={{ title: 'Klientët' }} />
       <Tabs.Screen name="settings" options={{ title: 'Profili' }} />
+      <Tabs.Screen name="create" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -9,11 +9,13 @@ import { Animated, StyleSheet, Text, View } from 'react-native';
 
 export default function SplashScreen() {
   const router = useRouter();
-  const { isAuthenticated } = useApp();
+  const { isAuthenticated, authReady } = useApp();
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.85)).current;
 
   useEffect(() => {
+    if (!authReady) return;
+
     Animated.parallel([
       Animated.timing(opacity, { toValue: 1, duration: 600, useNativeDriver: true }),
       Animated.spring(scale, { toValue: 1, friction: 6, useNativeDriver: true }),
@@ -23,7 +25,7 @@ export default function SplashScreen() {
       router.replace(isAuthenticated ? './tabs' : './auth/login');
     }, 2000);
     return () => clearTimeout(timer);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authReady, isAuthenticated, opacity, router, scale]);
 
   return (
     <Screen dark edges={['top', 'bottom']}>
@@ -37,7 +39,7 @@ export default function SplashScreen() {
           </Text>
         </Animated.View>
       </View>
-      <Text style={styles.footer}>VoiceBill · MVP</Text>
+      <Text style={styles.footer}>VoiceBill</Text>
     </Screen>
   );
 }

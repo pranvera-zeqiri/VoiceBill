@@ -8,7 +8,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 /**
  * SIMULATED speech-to-text: the transcript "types itself" word by word.
@@ -78,22 +78,33 @@ export default function VoiceScreen() {
     if (processing) return;
     setProcessing(true);
     finishTimer.current = setTimeout(() => {
-      const customer = customers.find((c) => c.name.includes('Berisha')) ?? customers[0];
-      const invoice = addInvoice({
-        customerId: customer.id,
-        title: 'Instalim elektrik',
-        vatRate: settings.autoVat ? settings.vatRate : 0,
-        status: 'draft',
-        fromVoice: true,
-        audioSeconds: Math.max(seconds, 1),
-        items: [
-          { id: uid(), title: 'Punë dore', quantity: 4, unit: 'orë', unitPrice: 25 },
-          { id: uid(), title: 'Priza', quantity: 2, unit: 'copë', unitPrice: 12 },
-          { id: uid(), title: 'Ndërprerës', quantity: 1, unit: 'copë', unitPrice: 11, needsConfirm: true },
-          { id: uid(), title: 'Llamba LED', quantity: 5, unit: 'copë', unitPrice: 10 },
-        ],
-      });
-      router.replace(`../../invoice/${invoice.id}`);
+      void (async () => {
+        try {
+          const customer = customers.find((c) => c.name.includes('Berisha')) ?? customers[0];
+          if (!customer) throw new Error('Shto një klient para se të krijosh faturë me zë.');
+          const invoice = await addInvoice({
+            customerId: customer.id,
+            title: 'Instalim elektrik',
+            vatRate: settings.autoVat ? settings.vatRate : 0,
+            status: 'draft',
+            fromVoice: true,
+            audioSeconds: Math.max(seconds, 1),
+            items: [
+              { id: uid(), title: 'Punë dore', quantity: 4, unit: 'orë', unitPrice: 25 },
+              { id: uid(), title: 'Priza', quantity: 2, unit: 'copë', unitPrice: 12 },
+              { id: uid(), title: 'Ndërprerës', quantity: 1, unit: 'copë', unitPrice: 11, needsConfirm: true },
+              { id: uid(), title: 'Llamba LED', quantity: 5, unit: 'copë', unitPrice: 10 },
+            ],
+          });
+          router.replace(`../invoice/${invoice.id}`);
+        } catch (error) {
+          Alert.alert(
+            'Nuk u ruajt fatura',
+            error instanceof Error ? error.message : 'Kontrollo lidhjen me internetin dhe provo përsëri.'
+          );
+          setProcessing(false);
+        }
+      })();
     }, 1400);
   };
 

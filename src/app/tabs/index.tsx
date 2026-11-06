@@ -14,14 +14,20 @@ import {
     todayLabel,
 } from '@/utils/format';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { user, invoices, getCustomer } = useApp();
+  const { user, invoices, getCustomer, invoicesLoading, invoicesError, refreshInvoices } = useApp();
   const firstName = user?.fullName.split(' ')[0] ?? '';
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshInvoices();
+    }, [refreshInvoices])
+  );
 
   const stats = useMemo(() => {
     const withTotal = invoices.map((i) => ({ ...i, total: calcTotals(i.items, i.vatRate).total }));
@@ -136,8 +142,21 @@ export default function DashboardScreen() {
         <SectionHeader
           title="Faturat e fundit"
           actionLabel="Të gjitha"
-          onAction={() => router.push('./invoice')}
+          onAction={() => router.push('/tabs/invoices')}
         />
+        {invoicesError ? (
+          <Pressable onPress={() => void refreshInvoices()} style={styles.invoiceNotice}>
+            <Text style={styles.invoiceNoticeText}>
+              Nuk u ngarkuan faturat nga Supabase. Prek për të provuar përsëri.
+            </Text>
+          </Pressable>
+        ) : null}
+        {invoicesLoading && invoices.length === 0 ? (
+          <Text style={styles.invoiceNoticeText}>Po ngarkohen faturat…</Text>
+        ) : null}
+        {!invoicesLoading && !invoicesError && invoices.length === 0 ? (
+          <Text style={styles.invoiceNoticeText}>Nuk ka ende fatura.</Text>
+        ) : null}
         {recent.map((inv) => (
           <InvoiceRow
             key={inv.id}
@@ -200,4 +219,11 @@ const styles = StyleSheet.create({
   },
   ctaTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
   ctaSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12, marginTop: 2 },
+  invoiceNotice: {
+    padding: 12,
+    marginBottom: 10,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+  },
+  invoiceNoticeText: { color: colors.textMuted, fontSize: 13, marginVertical: 8 },
 });

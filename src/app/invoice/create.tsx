@@ -42,6 +42,7 @@ export default function CreateInvoiceScreen() {
   const [title, setTitle] = useState('');
   const [items, setItems] = useState<DraftItem[]>([emptyItem()]);
   const [vatOn, setVatOn] = useState(settings.autoVat);
+  const [saving, setSaving] = useState(false);
 
   const vatRate = vatOn ? settings.vatRate : 0;
 
@@ -63,19 +64,30 @@ export default function CreateInvoiceScreen() {
   const patchItem = (id: string, patch: Partial<DraftItem>) =>
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
 
-  const save = (status: 'draft' | 'pending') => {
+  const save = async (status: 'draft' | 'pending') => {
+    if (saving) return;
     if (!customerId) return Alert.alert('Zgjidh klientin', 'Duhet të zgjedhësh një klient.');
     if (parsedItems.length === 0)
       return Alert.alert('Shto zëra', 'Shto të paktën një zë me përshkrim dhe çmim.');
 
-    const invoice = addInvoice({
-      customerId,
-      title: title.trim() || parsedItems[0].title,
-      items: parsedItems,
-      vatRate,
-      status,
-    });
-    router.replace(`/invoice/${invoice.id}`);
+    setSaving(true);
+    try {
+      const invoice = await addInvoice({
+        customerId,
+        title: title.trim() || parsedItems[0].title,
+        items: parsedItems,
+        vatRate,
+        status,
+      });
+      router.replace(`/invoice/${invoice.id}`);
+    } catch (error) {
+      Alert.alert(
+        'Nuk u ruajt fatura',
+        error instanceof Error ? error.message : 'Kontrollo lidhjen me internetin dhe provo përsëri.'
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -177,8 +189,8 @@ export default function CreateInvoiceScreen() {
       </KeyboardAvoidingView>
 
       <View style={styles.footer}>
-        <Button label="Ruaj draft" variant="outline" onPress={() => save('draft')} style={{ flex: 1 }} />
-        <Button label="Ruaj dhe shiko" onPress={() => save('pending')} style={{ flex: 1.4 }} />
+        <Button label="Ruaj draft" variant="outline" loading={saving} onPress={() => void save('draft')} style={{ flex: 1 }} />
+        <Button label="Ruaj dhe shiko" loading={saving} onPress={() => void save('pending')} style={{ flex: 1.4 }} />
       </View>
     </Screen>
   );

@@ -7,18 +7,24 @@ import { Invoice } from '@/types';
 import { daysSince } from '@/utils/format';
 import { shareReminder } from '@/utils/share';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 type Filter = 'all' | 'open' | 'paid';
 
 export default function InvoicesScreen() {
   const router = useRouter();
-  const { invoices, getCustomer } = useApp();
+  const { invoices, getCustomer, invoicesLoading, invoicesError, refreshInvoices } = useApp();
   const [filter, setFilter] = useState<Filter>('all');
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState('');
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshInvoices();
+    }, [refreshInvoices])
+  );
 
   const sorted = useMemo(
     () =>
@@ -130,7 +136,15 @@ export default function InvoicesScreen() {
           </View>
         ) : null}
 
-        {groups.length === 0 ? (
+        {invoicesError ? (
+          <Pressable onPress={() => void refreshInvoices()} style={styles.loadError}>
+            <Text style={styles.empty}>
+              Faturat nuk mund të ngarkoheshin nga Supabase. Prek për të provuar përsëri.
+            </Text>
+          </Pressable>
+        ) : invoicesLoading && invoices.length === 0 ? (
+          <Text style={styles.empty}>Po ngarkohen faturat...</Text>
+        ) : groups.length === 0 ? (
           <Text style={styles.empty}>Nuk u gjet asnjë faturë.</Text>
         ) : (
           groups.map((g) => (
@@ -203,4 +217,5 @@ const styles = StyleSheet.create({
   alertBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
   groupTitle: { fontSize: 12, color: colors.textMuted, marginTop: 14, marginBottom: 8, fontWeight: '600' },
   empty: { textAlign: 'center', color: colors.textMuted, marginTop: 40 },
+  loadError: { paddingVertical: 8 },
 });

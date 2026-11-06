@@ -1,4 +1,7 @@
-import { seedCustomers, seedInvoices } from '@/data/mock';
+import { supabase } from '@/lib/supabase';
+import { customerService } from '@/services/costumerService';
+import type { NewCustomerInput } from '@/services/costumerService';
+import { invoiceService } from '@/services/invoiceService';
 import {
     Customer,
     Invoice,
@@ -7,12 +10,15 @@ import {
     Settings,
     User,
 } from '@/types';
-import { calcTotals, daysAgoISO, todayISO, uid } from '@/utils/format';
+import { calcTotals, daysAgoISO, todayISO } from '@/utils/format';
+import { AppState, Platform } from 'react-native';
 import React, {
     createContext,
     useCallback,
     useContext,
+    useEffect,
     useMemo,
+    useRef,
     useState,
 } from 'react';
 
@@ -24,13 +30,6 @@ interface NewInvoiceInput {
   status?: InvoiceStatus;
   fromVoice?: boolean;
   audioSeconds?: number;
-}
-
-interface NewCustomerInput {
-  name: string;
-  phone: string;
-  email: string;
-  address?: string;
 }
 
 interface RegisterInput {
@@ -49,9 +48,10 @@ interface CustomerStats {
 interface AppContextValue {
   user: User | null;
   isAuthenticated: boolean;
+  authReady: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (input: RegisterInput, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   updateUser: (patch: Partial<User>) => void;
 
   settings: Settings;
@@ -59,23 +59,28 @@ interface AppContextValue {
 
   customers: Customer[];
   invoices: Invoice[];
+  invoicesLoading: boolean;
+  invoicesError: string | null;
+  refreshInvoices: () => Promise<void>;
   getCustomer: (id: string) => Customer | undefined;
   getInvoice: (id: string) => Invoice | undefined;
   getCustomerStats: (customerId: string) => CustomerStats;
-  addCustomer: (input: NewCustomerInput) => Customer;
-  addInvoice: (input: NewInvoiceInput) => Invoice;
+  addCustomer: (input: NewCustomerInput) => Promise<Customer>;
+  addInvoice: (input: NewInvoiceInput) => Promise<Invoice>;
   updateInvoice: (id: string, patch: Partial<Invoice>) => void;
   setInvoiceStatus: (id: string, status: InvoiceStatus) => void;
 }
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
-const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [customers, setCustomers] = useState<Customer[]>(seedCustomers);
-  const [invoices, setInvoices] = useState<Invoice[]>(seedInvoices);
+  const [authReady, setAuthReady] = useState(false);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [invoicesLoading, setInvoicesLoading] = useState(true);
+  const [invoicesError, setInvoicesError] = useState<string | null>(null);
+  const invoiceRequest = useRef(0);
   const [settings, setSettings] = useState<Settings>({
     notifications: true,
     autoReminders: true,
@@ -83,30 +88,125 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     vatRate: 18,
   });
 
-  /* ----- Auth (mocked — replace with Supabase later) ----- */
-  const login = useCallback(async (email: string, _password: string) => {
-    await wait(700);
-    setUser({
-      fullName: 'Arben Hoxha',
-      businessName: 'Hoxha Servis',
+  const refreshInvoices = useCallback(async () => {
+    const request = ++invoiceRequest.current;
+    setInvoicesLoading(true);
+    setInvoicesError(null);
+    try {
+      const loadedInvoices = await invoiceService.getInvoices();
+      if (request === invoiceRequest.current) setInvoices(loadedInvoices);
+    } catch (error) {
+      if (request === invoiceRequest.current) {
+        setInvoicesError(
+          error instanceof Error ? error.message : 'Faturat nuk mund të ngarkoheshin.'
+        );
+      }
+      console.error('Gabim gjatë ngarkimit të faturave nga Supabase:', error);
+    } finally {
+      if (request === invoiceRequest.current) setInvoicesLoading(false);
+    }
+  }, []);
+
+  /* ----- Auth (Supabase Integration) ----- */
+  useEffect(() => {
+    let active = true;
+    let customerRequest = 0;
+    let authChangeTimeout: ReturnType<typeof setTimeout> | undefined;
+    const loadCustomers = () => {
+      if (!active) return;
+      const request = ++customerRequest;
+      void customerService
+        .getCustomers()
+        .then((loadedCustomers) => {
+          if (active && request === customerRequest) setCustomers(loadedCustomers);
+        })
+        .catch((error: unknown) => {
+          console.error('Gabim në ngarkimin e klientëve nga Supabase:', error);
+        });
+    };
+
+    // INITIAL_SESSION is emitted after Supabase has restored the persisted session.
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active) return;
+      setAuthReady(true);
+      if (session?.user) {
+        setUser({
+          fullName: session.user.user_metadata?.full_name || 'Zejtar',
+          businessName: session.user.user_metadata?.business_name || 'Servis',
+          email: session.user.email || '',
+          phone: '',
+          taxId: '',
+        });
+        if (authChangeTimeout) clearTimeout(authChangeTimeout);
+        authChangeTimeout = setTimeout(() => {
+          if (!active) return;
+          loadCustomers();
+          void refreshInvoices();
+        }, 0);
+      } else {
+        if (authChangeTimeout) clearTimeout(authChangeTimeout);
+        customerRequest += 1;
+        invoiceRequest.current += 1;
+        setUser(null);
+        setCustomers([]);
+        setInvoices([]);
+        setInvoicesError(null);
+        setInvoicesLoading(false);
+      }
+    });
+
+    const appStateSubscription =
+      Platform.OS === 'web'
+        ? undefined
+        : AppState.addEventListener('change', (state) => {
+            if (state === 'active') {
+              void supabase.auth.startAutoRefresh();
+            } else {
+              void supabase.auth.stopAutoRefresh();
+            }
+          });
+
+    if (Platform.OS !== 'web' && AppState.currentState === 'active') {
+      void supabase.auth.startAutoRefresh();
+    }
+
+    return () => {
+      active = false;
+      customerRequest += 1;
+      invoiceRequest.current += 1;
+      if (authChangeTimeout) clearTimeout(authChangeTimeout);
+      authListener.subscription.unsubscribe();
+      appStateSubscription?.remove();
+      if (Platform.OS !== 'web') void supabase.auth.stopAutoRefresh();
+    };
+  }, [refreshInvoices]);
+
+  const login = useCallback(async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
       email,
-      phone: '+383 44 000 111',
-      taxId: '811234567',
+      password,
     });
+    if (error) throw error;
   }, []);
 
-  const register = useCallback(async (input: RegisterInput, _password: string) => {
-    await wait(900);
-    setUser({
-      fullName: input.fullName,
-      businessName: input.businessName,
+  const register = useCallback(async (input: RegisterInput, password: string) => {
+    const { data, error } = await supabase.auth.signUp({
       email: input.email,
-      phone: '',
-      taxId: '',
+      password,
+      options: {
+        data: {
+          full_name: input.fullName,
+          business_name: input.businessName,
+        },
+      },
     });
+    if (error) throw error;
   }, []);
 
-  const logout = useCallback(() => setUser(null), []);
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  }, []);
 
   const updateUser = useCallback(
     (patch: Partial<User>) => setUser((prev) => (prev ? { ...prev, ...patch } : prev)),
@@ -148,39 +248,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addCustomer = useCallback(
-    (input: NewCustomerInput) => {
-      const created: Customer = {
-        id: `c-${uid()}`,
-        name: input.name,
-        phone: input.phone,
-        email: input.email,
-        address: input.address ?? '',
-        since: todayISO(),
-        avgPayDays: 0,
-      };
-      setCustomers((prev) => [created, ...prev]);
+    async (input: NewCustomerInput) => {
+      const created = await customerService.addCustomer(input);
+      setCustomers((prev) => [created, ...prev.filter((customer) => customer.id !== created.id)]);
       return created;
     },
     []
   );
 
   const addInvoice = useCallback(
-    (input: NewInvoiceInput) => {
+    async (input: NewInvoiceInput) => {
       const nextNumber = Math.max(0, ...invoices.map((i) => Number(i.number))) + 1;
-      const created: Invoice = {
-        id: `inv-${uid()}`,
-        number: String(nextNumber).padStart(4, '0'),
+      const created = await invoiceService.createInvoice({
         customerId: input.customerId,
+        number: String(nextNumber).padStart(4, '0'),
         title: input.title,
         date: todayISO(),
-        dueDate: daysAgoISO(-14),
         status: input.status ?? 'draft',
-        items: input.items,
         vatRate: input.vatRate,
+        dueDate: daysAgoISO(-14),
         fromVoice: input.fromVoice,
         audioSeconds: input.audioSeconds,
-      };
-      setInvoices((prev) => [created, ...prev]);
+        items: input.items,
+      });
+      setInvoices((prev) => [created, ...prev.filter((invoice) => invoice.id !== created.id)]);
       return created;
     },
     [invoices]
@@ -199,6 +290,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     () => ({
       user,
       isAuthenticated: !!user,
+      authReady,
       login,
       register,
       logout,
@@ -207,6 +299,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateSettings,
       customers,
       invoices,
+      invoicesLoading,
+      invoicesError,
+      refreshInvoices,
       getCustomer,
       getInvoice,
       getCustomerStats,
@@ -216,8 +311,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setInvoiceStatus,
     }),
     [
-      user, login, register, logout, updateUser, settings, updateSettings,
-      customers, invoices, getCustomer, getInvoice, getCustomerStats,
+      user, authReady, login, register, logout, updateUser, settings, updateSettings,
+      customers, invoices, invoicesLoading, invoicesError, refreshInvoices,
+      getCustomer, getInvoice, getCustomerStats,
       addCustomer, addInvoice, updateInvoice, setInvoiceStatus,
     ]
   );

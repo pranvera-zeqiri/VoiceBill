@@ -55,7 +55,9 @@ export function TabBar({ state, descriptors, emitter, navigateToTab }: BottomTab
     );
   };
 
-  const visibleRoutes = state.routes.filter((route) => route.name !== 'voice');
+  const visibleRoutes = state.routes.filter(
+    (route) => route.name !== 'voice' && route.name !== 'create'
+  );
   const left = visibleRoutes.slice(0, 2);
   const right = visibleRoutes.slice(2);
 

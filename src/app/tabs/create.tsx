@@ -8,7 +8,7 @@ import { uid } from '@/utils/format';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function CreateInvoiceScreen() {
   const router = useRouter();
@@ -17,8 +17,10 @@ export default function CreateInvoiceScreen() {
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const createInvoice = () => {
+  const createInvoice = async () => {
+    if (saving) return;
     const amount = Number(price.replace(',', '.'));
     if (!customerId) {
       setError('Zgjidh një klient për faturën.');
@@ -33,13 +35,22 @@ export default function CreateInvoiceScreen() {
       return;
     }
 
-    const invoice = addInvoice({
-      customerId,
-      title: title.trim(),
-      vatRate: settings.autoVat ? settings.vatRate : 0,
-      items: [{ id: uid(), title: title.trim(), quantity: 1, unit: 'copë', unitPrice: amount }],
-    });
-    router.replace(`../../invoice/${invoice.id}`);
+    setSaving(true);
+    try {
+      const invoice = await addInvoice({
+        customerId,
+        title: title.trim(),
+        vatRate: settings.autoVat ? settings.vatRate : 0,
+        items: [{ id: uid(), title: title.trim(), quantity: 1, unit: 'copë', unitPrice: amount }],
+      });
+      router.replace(`../../invoice/${invoice.id}`);
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'Provo përsëri.';
+      setError(message);
+      Alert.alert('Nuk u ruajt fatura', message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -102,7 +113,8 @@ export default function CreateInvoiceScreen() {
         <Button
           label="Krijo faturën"
           icon="plus"
-          onPress={createInvoice}
+          loading={saving}
+          onPress={() => void createInvoice()}
           disabled={customers.length === 0}
           style={styles.submit}
         />
