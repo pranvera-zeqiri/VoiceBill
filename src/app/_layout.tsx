@@ -1,14 +1,34 @@
+import { colors } from '@/constants/theme';
+import { AppProvider } from '@/context/AppContext';
 import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 export default function RootLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      {/* Grupi i tab-eve kryesore me navbar (Ballina, Klientët, Profili) */}
-      <Stack.Screen name="(tabs)" />
-      
-      {/* Ekranet e faturës dhe zërit që hapen pa navbar dhe me shigjetë lart */}
-      <Stack.Screen name="invoice" />
-      <Stack.Screen name="add-bill" />
-    </Stack>
+    <SafeAreaProvider>
+      <AppProvider>
+        <StatusBar style="dark" />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: colors.background },
+            animation: 'slide_from_right',
+          }}
+        >
+          <Stack.Screen name="index" options={{ animation: 'fade' }} />
+          <Stack.Screen name="auth" options={{ animation: 'fade' }} />
+          <Stack.Screen name="tabs" options={{ animation: 'fade', gestureEnabled: false }} />
+          <Stack.Screen
+            name="voice"
+            options={{
+              presentation: 'fullScreenModal',
+              animation: 'slide_from_bottom',
+              contentStyle: { backgroundColor: colors.dark },
+            }}
+          />
+        </Stack>
+      </AppProvider>
+    </SafeAreaProvider>
   );
 }

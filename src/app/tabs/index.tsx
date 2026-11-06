@@ -1,139 +1,203 @@
+import { InvoiceRow } from '@/components/InvoiceRow';
+import { MiniBarChart } from '@/components/MiniBarChart';
+import { Screen } from '@/components/Screen';
+import { SectionHeader } from '@/components/SectionHeader';
+import { StatCard } from '@/components/StatCard';
+import { colors, radius, shadow } from '@/constants/theme';
+import { useApp } from '@/context/AppContext';
+import {
+    calcTotals,
+    currentMonthName,
+    daysAgoISO,
+    formatMoneyCompact,
+    toISO,
+    todayLabel,
+} from '@/utils/format';
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { supabase } from '../../../lib/supabase';
+import { useMemo } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const [totalRevenue, setTotalRevenue] = useState(0);
-  const [invoices, setInvoices] = useState<any[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
+  const { user, invoices, getCustomer } = useApp();
+  const firstName = user?.fullName.split(' ')[0] ?? '';
 
-  const fetchLiveInvoices = async () => {
-    setRefreshing(true);
-    try {
-      const { data, error } = await supabase
-        .from('invoices')
-        .select('*')
-        .order('created_at', { ascending: false });
+  const stats = useMemo(() => {
+    const withTotal = invoices.map((i) => ({ ...i, total: calcTotals(i.items, i.vatRate).total }));
+    const sum = (list: typeof withTotal) => list.reduce((s, i) => s + i.total, 0);
 
-      if (error) throw error;
+    const paid = withTotal.filter((i) => i.status === 'paid');
+    const open = withTotal.filter((i) => i.status === 'pending' || i.status === 'overdue');
 
-      if (data) {
-        setInvoices(data);
-        const sum = data.reduce((acc, curr) => acc + Number(curr.total || 0), 0);
-        setTotalRevenue(sum);
-      }
-    } catch (error) {
-      console.error('Gabim në Supabase:', error);
-    } finally {
-      setRefreshing(false);
-    }
-  };
+    const now = new Date();
+    const curMonth = toISO(now).slice(0, 7);
+    const prevMonth = toISO(new Date(now.getFullYear(), now.getMonth() - 1, 1)).slice(0, 7);
+    const revenue = sum(paid.filter((i) => i.date.startsWith(curMonth)));
+    const prevRevenue = sum(paid.filter((i) => i.date.startsWith(prevMonth)));
+    const growth = prevRevenue > 0 ? Math.round(((revenue - prevRevenue) / prevRevenue) * 100) : null;
 
-  useEffect(() => {
-    fetchLiveInvoices();
-  }, []);
+    // Last 7 days of issued (non-draft) invoices for the mini chart
+    const chart = Array.from({ length: 7 }, (_, idx) => {
+      const day = daysAgoISO(6 - idx);
+      return sum(withTotal.filter((i) => i.status !== 'draft' && i.date === day));
+    });
+
+    return {
+      revenue,
+      growth,
+      chart,
+      openTotal: sum(open),
+      openCount: open.length,
+      paidTotal: sum(paid),
+      paidCount: paid.length,
+    };
+  }, [invoices]);
+
+  const recent = useMemo(
+    () => [...invoices].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : Number(b.number) - Number(a.number))).slice(0, 3),
+    [invoices]
+  );
 
   return (
-    <ScrollView 
-      contentContainerStyle={styles.container} 
-      showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchLiveInvoices} tintColor="#FB923C" />}
-    >
-      {/* Header */}
-      <View style={styles.headerRow}>
-        <View>
-          <Text style={styles.dateText}>E mërkurë, 4 nëntor</Text>
-          <Text style={styles.greetingText}>Mirëdita, Pranvera</Text>
-        </View>
-      </View>
-
-      {/* Karta e Zeze - Të Ardhura Totale Live */}
-      <View style={styles.revenueCard}>
-        <Text style={styles.revenueLabel}>Të ardhura Totale · Nëntor</Text>
-        <Text style={styles.revenueAmount}>€{totalRevenue.toFixed(2)}</Text>
-        <Text style={styles.revenueSub}>Të dhëna live nga Supabase</Text>
-      </View>
-
-      {/* Banneri Portokallor - Pa veprim tani për tani */}
-      <TouchableOpacity 
-        style={styles.actionBanner} 
-        activeOpacity={0.9}
-      >
-        <View style={styles.micCircle}>
-          <View style={styles.micHead} />
-          <View style={styles.micStand} />
-        </View>
-        <View style={{ flex: 1, marginLeft: 16 }}>
-          <Text style={styles.actionTitle}>Fol dhe krijo faturë</Text>
-          <Text style={styles.actionSub}>Shtyp këtu për gjenerimin me zë</Text>
-        </View>
-        <Text style={styles.arrowIcon}>→</Text>
-      </TouchableOpacity>
-
-      {/* Faturat e Fundit */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Faturat e fundit</Text>
-        <TouchableOpacity onPress={fetchLiveInvoices}>
-          <Text style={styles.refreshText}>Rifresko 🔄</Text>
-        </TouchableOpacity>
-      </View>
-
-      {invoices.length === 0 ? (
-        <Text style={styles.emptyText}>Nuk ka asnjë faturë ende në Supabase.</Text>
-      ) : (
-        invoices.slice(0, 3).map((item) => (
-          <View key={item.id} style={styles.invoiceItem}>
-            <View style={styles.avatarFb}>
-              <Text style={styles.avatarTextFb}>
-                {item.client_name ? item.client_name.substring(0, 2).toUpperCase() : 'FT'}
-              </Text>
-            </View>
-            <View style={{ flex: 1, marginLeft: 14 }}>
-              <Text style={styles.clientName}>{item.client_name}</Text>
-              <Text style={styles.clientSub}>{item.service_description}</Text>
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.invoicePrice}>€{Number(item.total).toFixed(2)}</Text>
-              <Text style={styles.statusPending}>{item.status || 'Në pritje'}</Text>
-            </View>
+    <Screen>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Top row */}
+        <View style={styles.topRow}>
+          <View>
+            <Text style={styles.date}>{todayLabel()}</Text>
+            <Text style={styles.greeting}>Mirëdita, {firstName}</Text>
           </View>
-        ))
-      )}
-    </ScrollView>
+          <Pressable
+            style={styles.bell}
+            onPress={() =>
+              Alert.alert(
+                'Njoftimet',
+                stats.openCount > 0
+                  ? `Ke ${stats.openCount} fatura në pritje të pagesës.`
+                  : 'Nuk ke njoftime të reja.'
+              )
+            }
+          >
+            <Feather name="bell" size={20} color={colors.primary} />
+          </Pressable>
+        </View>
+
+        {/* Revenue card */}
+        <View style={styles.revenueCard}>
+          <View style={styles.revenueTop}>
+            <Text style={styles.revenueLabel}>Të ardhura · {currentMonthName()}</Text>
+            {stats.growth !== null ? (
+              <View style={styles.growth}>
+                <Text style={styles.growthText}>
+                  {stats.growth >= 0 ? '+' : ''}
+                  {stats.growth}% nga muaji i kaluar
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={styles.revenueValue}>{formatMoneyCompact(stats.revenue)}</Text>
+          <MiniBarChart values={stats.chart} />
+          <Text style={styles.revenueCaption}>7 ditët e fundit</Text>
+        </View>
+
+        {/* Stats */}
+        <View style={styles.statsRow}>
+          <StatCard
+            label="Në pritje"
+            dotColor={colors.primary}
+            value={formatMoneyCompact(stats.openTotal)}
+            sub={`${stats.openCount} fatura`}
+          />
+          <StatCard
+            label="Të paguara"
+            dotColor={colors.success}
+            value={formatMoneyCompact(stats.paidTotal)}
+            sub={`${stats.paidCount} fatura`}
+          />
+        </View>
+
+        {/* Voice CTA */}
+        <Pressable
+          onPress={() => router.push('./voice')}
+          style={({ pressed }) => [styles.cta, pressed && { opacity: 0.9 }]}
+        >
+          <View style={styles.ctaIcon}>
+            <Feather name="mic" size={22} color="#FFFFFF" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.ctaTitle}>Fol dhe krijo faturë</Text>
+            <Text style={styles.ctaSub}>Shtyp dhe tregoji çfarë punove</Text>
+          </View>
+          <Feather name="arrow-right" size={20} color="#FFFFFF" />
+        </Pressable>
+
+        {/* Recent invoices */}
+        <SectionHeader
+          title="Faturat e fundit"
+          actionLabel="Të gjitha"
+          onAction={() => router.push('./invoice')}
+        />
+        {recent.map((inv) => (
+          <InvoiceRow
+            key={inv.id}
+            invoice={inv}
+            customerName={getCustomer(inv.customerId)?.name ?? 'Klient'}
+            subtitleMode="day"
+            onPress={() => router.push(`../invoice/${inv.id}`)}
+          />
+        ))}
+      </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, backgroundColor: '#FAF5EE', paddingHorizontal: 22, paddingTop: 60, paddingBottom: 40 },
-  headerRow: { marginBottom: 20 },
-  dateText: { fontSize: 13, color: '#78716C', fontWeight: '600' },
-  greetingText: { fontSize: 26, fontWeight: '900', color: '#1C1917', marginTop: 3 },
-  
-  revenueCard: { backgroundColor: '#1C1917', borderRadius: 28, padding: 24, marginBottom: 18 },
-  revenueLabel: { fontSize: 13, color: '#A8A29E', fontWeight: '600' },
-  revenueAmount: { fontSize: 38, fontWeight: '900', color: '#FFFFFF', marginVertical: 8 },
-  revenueSub: { fontSize: 12, color: '#78716C', fontWeight: '500' },
-
-  actionBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FB923C', borderRadius: 24, padding: 18, marginBottom: 28 },
-  micCircle: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#1C1917', justifyContent: 'center', alignItems: 'center' },
-  micHead: { width: 10, height: 14, backgroundColor: '#FB923C', borderRadius: 5 },
-  micStand: { width: 14, height: 6, borderWidth: 2, borderColor: '#FB923C', marginTop: -2 },
-  actionTitle: { fontSize: 16, fontWeight: '900', color: '#1C1917' },
-  actionSub: { fontSize: 12, color: '#44403C', fontWeight: '500', marginTop: 2 },
-  arrowIcon: { fontSize: 20, fontWeight: 'bold', color: '#1C1917' },
-
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  sectionTitle: { fontSize: 18, fontWeight: '900', color: '#1C1917' },
-  refreshText: { fontSize: 13, fontWeight: '700', color: '#0284C7' },
-  emptyText: { textAlign: 'center', color: '#78716C', fontStyle: 'italic', marginTop: 10 },
-
-  invoiceItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 16, borderRadius: 20, borderWidth: 1, borderColor: '#E7E5E4', marginBottom: 10 },
-  avatarFb: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#DCFCE7', justifyContent: 'center', alignItems: 'center' },
-  avatarTextFb: { color: '#16A34A', fontWeight: '900', fontSize: 13 },
-  clientName: { fontSize: 15, fontWeight: '900', color: '#1C1917' },
-  clientSub: { fontSize: 12, color: '#78716C', fontWeight: '500', marginTop: 2 },
-  invoicePrice: { fontSize: 16, fontWeight: '900', color: '#1C1917' },
-  statusPending: { fontSize: 11, fontWeight: '700', color: '#CA8A04', marginTop: 3 },
+  content: { padding: 20, paddingBottom: 32 },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  date: { fontSize: 12, color: colors.textMuted },
+  greeting: { fontSize: 24, fontWeight: '800', color: colors.text, marginTop: 2, letterSpacing: -0.4 },
+  bell: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  revenueCard: {
+    backgroundColor: colors.dark,
+    borderRadius: radius.lg,
+    padding: 18,
+    marginTop: 18,
+  },
+  revenueTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  revenueLabel: { color: colors.textOnDarkMuted, fontSize: 12, flexShrink: 1 },
+  growth: { backgroundColor: 'rgba(23,160,106,0.18)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  growthText: { color: '#3DDC97', fontSize: 11, fontWeight: '700' },
+  revenueValue: { color: '#FFFFFF', fontSize: 36, fontWeight: '800', marginVertical: 8, letterSpacing: -1 },
+  revenueCaption: { color: colors.textOnDarkMuted, fontSize: 11, marginTop: 10 },
+  statsRow: { flexDirection: 'row', gap: 12, marginTop: 14 },
+  cta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    padding: 14,
+    marginTop: 14,
+    ...shadow,
+  },
+  ctaIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.dark,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ctaTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  ctaSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12, marginTop: 2 },
 });
