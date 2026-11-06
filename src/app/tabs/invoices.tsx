@@ -92,7 +92,7 @@ export default function InvoicesScreen() {
             </Pressable>
             <Pressable
               style={[styles.iconBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}
-              onPress={() => router.push('./create')}
+              onPress={() => router.push('/invoice/create')}
             >
               <Feather name="plus" size={20} color="#FFFFFF" />
             </Pressable>

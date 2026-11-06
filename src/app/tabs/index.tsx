@@ -61,7 +61,14 @@ export default function DashboardScreen() {
   }, [invoices]);
 
   const recent = useMemo(
-    () => [...invoices].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : Number(b.number) - Number(a.number))).slice(0, 3),
+    () =>
+      [...invoices]
+        .sort(
+          (a, b) =>
+            b.date.localeCompare(a.date) ||
+            b.number.localeCompare(a.number, 'en', { numeric: true })
+        )
+        .slice(0, 3),
     [invoices]
   );
 

@@ -1,7 +1,10 @@
 import { supabase } from '@/lib/supabase';
 import type { Invoice, InvoiceItem, InvoiceStatus } from '@/types';
 
-type InvoiceItemInput = Pick<InvoiceItem, 'title' | 'quantity' | 'unit' | 'unitPrice'>;
+type InvoiceItemInput = Pick<
+  InvoiceItem,
+  'title' | 'quantity' | 'unit' | 'unitPrice' | 'needsConfirm'
+>;
 
 export interface CreateInvoiceInput {
   customerId: string;
@@ -100,67 +103,74 @@ export const invoiceService = {
   },
 
   async createInvoice(invoiceData: CreateInvoiceInput): Promise<Invoice> {
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError) throw authError;
-    if (!authData.user) throw new Error('Përdoruesi nuk është i kyçur.');
+    try {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      if (!authData.user) throw new Error('Përdoruesi nuk është i kyçur.');
 
-    const { items, customerId, dueDate, vatRate, fromVoice, audioSeconds, ...invoiceFields } =
-      invoiceData;
-    const { data: newInvoice, error: invoiceError } = await supabase
-      .from('invoices')
-      .insert({
-        ...invoiceFields,
-        customer_id: customerId,
-        due_date: dueDate,
-        vat_rate: vatRate,
-        from_voice: fromVoice,
-        audio_seconds: audioSeconds,
-        user_id: authData.user.id,
-      })
-      .select()
-      .single();
+      const { items, customerId, dueDate, vatRate, fromVoice, audioSeconds, ...invoiceFields } =
+        invoiceData;
+      const { data: newInvoice, error: invoiceError } = await supabase
+        .from('invoices')
+        .insert({
+          ...invoiceFields,
+          customer_id: customerId,
+          due_date: dueDate,
+          vat_rate: vatRate,
+          from_voice: fromVoice,
+          audio_seconds: audioSeconds,
+          user_id: authData.user.id,
+        })
+        .select()
+        .single();
 
-    if (invoiceError) throw invoiceError;
+      if (invoiceError) throw invoiceError;
 
-    if (items && items.length > 0) {
-      const { error: itemsError } = await supabase
-        .from('invoice_items')
-        .insert(
-          items.map((item) => ({
-            invoice_id: newInvoice.id,
-            title: item.title,
-            quantity: item.quantity,
-            unit: item.unit || 'shërbim',
-            unit_price: item.unitPrice,
-          }))
-        );
-
-      if (itemsError) {
-        const { error: rollbackError } = await supabase
-          .from('invoices')
-          .delete()
-          .eq('id', newInvoice.id);
-        if (rollbackError) {
-          throw new Error(
-            `Zërat e faturës nuk u ruajtën (${itemsError.message}) dhe fatura e paplotë nuk u fshi (${rollbackError.message}).`
+      if (items && items.length > 0) {
+        const { error: itemsError } = await supabase
+          .from('invoice_items')
+          .insert(
+            items.map((item) => ({
+              invoice_id: newInvoice.id,
+              title: item.title,
+              quantity: item.quantity,
+              unit: item.unit || 'shërbim',
+              unit_price: item.unitPrice,
+              needs_confirm: item.needsConfirm ?? false,
+            }))
           );
-        }
-        throw itemsError;
-      }
-    }
 
-    const fallbackItems: InvoiceItemRecord[] = items.map((item, index) => ({
-      id: `${newInvoice.id}-${index}`,
-      title: item.title,
-      quantity: item.quantity,
-      unit: item.unit,
-      unit_price: item.unitPrice,
-    }));
-    const invoiceRecord: InvoiceRecord = {
-      ...(newInvoice as InvoiceRecord),
-      invoice_items: fallbackItems,
-    };
-    return mapInvoice(invoiceRecord);
+        if (itemsError) {
+          const { error: rollbackError } = await supabase
+            .from('invoices')
+            .delete()
+            .eq('id', newInvoice.id);
+          if (rollbackError) {
+            throw new Error(
+              `Zërat e faturës nuk u ruajtën (${itemsError.message}) dhe fatura e paplotë nuk u fshi (${rollbackError.message}).`
+            );
+          }
+          throw itemsError;
+        }
+      }
+
+      const fallbackItems: InvoiceItemRecord[] = items.map((item, index) => ({
+        id: `${newInvoice.id}-${index}`,
+        title: item.title,
+        quantity: item.quantity,
+        unit: item.unit || 'shërbim',
+        unit_price: item.unitPrice,
+        needs_confirm: item.needsConfirm ?? false,
+      }));
+      const invoiceRecord: InvoiceRecord = {
+        ...(newInvoice as InvoiceRecord),
+        invoice_items: fallbackItems,
+      };
+      return mapInvoice(invoiceRecord);
+    } catch (error) {
+      console.error('SUPABASE_ERROR:', JSON.stringify(error, null, 2));
+      throw error;
+    }
   },
 
   async updateInvoiceStatus(invoiceId: string, status: 'draft' | 'pending' | 'paid' | 'overdue') {

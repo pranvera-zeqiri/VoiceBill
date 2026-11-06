@@ -9,7 +9,7 @@ import { InvoiceItem } from '@/types';
 import { calcTotals, formatMoney, uid } from '@/utils/format';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
     Alert,
     KeyboardAvoidingView,
@@ -46,6 +46,10 @@ export default function CreateInvoiceScreen() {
 
   const vatRate = vatOn ? settings.vatRate : 0;
 
+  useEffect(() => {
+    if (!customerId && customers[0]) setCustomerId(customers[0].id);
+  }, [customerId, customers]);
+
   const parsedItems: InvoiceItem[] = useMemo(
     () =>
       items
@@ -67,6 +71,14 @@ export default function CreateInvoiceScreen() {
   const save = async (status: 'draft' | 'pending') => {
     if (saving) return;
     if (!customerId) return Alert.alert('Zgjidh klientin', 'Duhet të zgjedhësh një klient.');
+    const incompleteItem = items.some(
+      (item) =>
+        item.title.trim() &&
+        (num(item.quantity) <= 0 || num(item.unitPrice) <= 0)
+    );
+    if (incompleteItem) {
+      return Alert.alert('Kontrollo zërat', 'Çdo zë i plotësuar duhet të ketë sasi dhe çmim më të madh se zero.');
+    }
     if (parsedItems.length === 0)
       return Alert.alert('Shto zëra', 'Shto të paktën një zë me përshkrim dhe çmim.');
 
@@ -189,7 +201,7 @@ export default function CreateInvoiceScreen() {
       </KeyboardAvoidingView>
 
       <View style={styles.footer}>
-        <Button label="Ruaj draft" variant="outline" loading={saving} onPress={() => void save('draft')} style={{ flex: 1 }} />
+        <Button label="Ruaj" variant="outline" loading={saving} onPress={() => void save('draft')} style={{ flex: 1 }} />
         <Button label="Ruaj dhe shiko" loading={saving} onPress={() => void save('pending')} style={{ flex: 1.4 }} />
       </View>
     </Screen>
