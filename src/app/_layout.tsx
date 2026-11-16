@@ -20,6 +20,22 @@ export default function RootLayout() {
           <Stack.Screen name="auth" options={{ animation: 'fade' }} />
           <Stack.Screen name="tabs" options={{ animation: 'fade', gestureEnabled: false }} />
           <Stack.Screen
+            name="invoice"
+            options={{
+              presentation: 'fullScreenModal',
+              animation: 'slide_from_bottom',
+              contentStyle: { backgroundColor: '#141312' },
+            }}
+          />
+          <Stack.Screen
+            name="add-bill"
+            options={{
+              presentation: 'fullScreenModal',
+              animation: 'slide_from_right',
+              contentStyle: { backgroundColor: '#FAF5EE' },
+            }}
+          />
+          <Stack.Screen
             name="voice"
             options={{
               presentation: 'fullScreenModal',

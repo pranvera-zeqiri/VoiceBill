@@ -18,6 +18,7 @@ export interface Invoice {
   id: string;
   number: string; // "0047"
   customerId: string;
+  customerName?: string;
   title: string;
   date: string; // YYYY-MM-DD
   dueDate: string; // YYYY-MM-DD

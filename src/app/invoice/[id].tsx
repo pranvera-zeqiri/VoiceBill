@@ -4,13 +4,15 @@ import { StatusBadge } from '@/components/statusBadge';
 import { colors, radius } from '@/constants/theme';
 import { useApp } from '@/context/AppContext';
 import { calcTotals, formatDate, formatMoney } from '@/utils/format';
+import { shareInvoice } from '@/utils/share';
+import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function InvoiceDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { getCustomer, getInvoice } = useApp();
+  const { getCustomer, getInvoice, user } = useApp();
   const invoice = getInvoice(id);
 
   if (!invoice) {
@@ -26,10 +28,36 @@ export default function InvoiceDetailsScreen() {
 
   const customer = getCustomer(invoice.customerId);
   const totals = calcTotals(invoice.items, invoice.vatRate);
+  const share = async () => {
+    try {
+      await shareInvoice(
+        invoice,
+        customer?.name ?? invoice.customerName ?? 'Klient',
+        user?.businessName ?? 'VoiceBill'
+      );
+    } catch (error) {
+      Alert.alert(
+        'Nuk u nda fatura',
+        error instanceof Error ? error.message : 'Provo përsëri të ndash faturën.'
+      );
+    }
+  };
 
   return (
     <Screen>
-      <Header title={`Fatura #${invoice.number}`} onBack={() => router.back()} />
+      <Header
+        title={`Fatura #${invoice.number}`}
+        onBack={() => router.back()}
+        right={
+          <Pressable
+            accessibilityLabel="Ndaj faturën"
+            onPress={() => void share()}
+            style={styles.shareButton}
+          >
+            <Feather name="share-2" size={18} color={colors.text} />
+          </Pressable>
+        }
+      />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.summary}>
           <View style={styles.summaryTop}>
@@ -80,6 +108,16 @@ function TotalRow({ label, value, strong = false }: { label: string; value: stri
 
 const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 32 },
+  shareButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   summary: {
     padding: 16,
     borderRadius: radius.lg,

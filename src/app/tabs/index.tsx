@@ -132,7 +132,7 @@ export default function DashboardScreen() {
 
         {/* Voice CTA */}
         <Pressable
-          onPress={() => router.push('./voice')}
+          onPress={() => router.push('/invoice')}
           style={({ pressed }) => [styles.cta, pressed && { opacity: 0.9 }]}
         >
           <View style={styles.ctaIcon}>

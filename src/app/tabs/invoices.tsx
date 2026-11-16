@@ -1,17 +1,36 @@
-import { Chip } from '@/components/Chip';
-import { InvoiceRow } from '@/components/InvoiceRow';
 import { Screen } from '@/components/Screen';
-import { colors, radius } from '@/constants/theme';
 import { useApp } from '@/context/AppContext';
-import { Invoice } from '@/types';
-import { daysSince } from '@/utils/format';
-import { shareReminder } from '@/utils/share';
+import { invoiceService } from '@/services/invoiceService';
+import type { Invoice, InvoiceStatus } from '@/types';
+import { daysSince, getInitials, statusLabel } from '@/utils/format';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { shareReminder } from '@/utils/share';
 
 type Filter = 'all' | 'open' | 'paid';
+
+function formatMoney(value: number) {
+  return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
+}
+
+function getInvoiceTotal(invoice: Invoice) {
+  const subtotal = invoice.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+  return subtotal * (1 + invoice.vatRate / 100);
+}
+
+function displayStatus(invoice: Invoice): InvoiceStatus {
+  return invoice.status === 'pending' && daysSince(invoice.dueDate) > 0 ? 'overdue' : invoice.status;
+}
 
 export default function InvoicesScreen() {
   const router = useRouter();
@@ -19,6 +38,7 @@ export default function InvoicesScreen() {
   const [filter, setFilter] = useState<Filter>('all');
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState('');
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -27,137 +47,163 @@ export default function InvoicesScreen() {
   );
 
   const sorted = useMemo(
-    () =>
-      [...invoices].sort((a, b) =>
-        a.date === b.date ? Number(b.number) - Number(a.number) : a.date < b.date ? 1 : -1
-      ),
+    () => [...invoices].sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number, 'en', { numeric: true })),
     [invoices]
   );
-
-  const openCount = invoices.filter((i) => i.status === 'pending' || i.status === 'overdue').length;
-  const paidCount = invoices.filter((i) => i.status === 'paid').length;
-
+  const openCount = invoices.filter((invoice) => ['pending', 'overdue'].includes(displayStatus(invoice))).length;
+  const paidCount = invoices.filter((invoice) => invoice.status === 'paid').length;
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return sorted.filter((i) => {
-      if (filter === 'open' && !(i.status === 'pending' || i.status === 'overdue')) return false;
-      if (filter === 'paid' && i.status !== 'paid') return false;
-      if (!q) return true;
-      const name = getCustomer(i.customerId)?.name.toLowerCase() ?? '';
-      return name.includes(q) || i.title.toLowerCase().includes(q) || i.number.includes(q);
+    const search = query.trim().toLocaleLowerCase();
+    return sorted.filter((invoice) => {
+      const status = displayStatus(invoice);
+      if (filter === 'open' && status !== 'pending' && status !== 'overdue') return false;
+      if (filter === 'paid' && status !== 'paid') return false;
+      if (!search) return true;
+      const client = (invoice.customerName ?? getCustomer(invoice.customerId)?.name ?? '').toLocaleLowerCase();
+      return client.includes(search) || invoice.number.toLocaleLowerCase().includes(search);
     });
   }, [sorted, filter, query, getCustomer]);
 
   const groups = useMemo(() => {
-    const g: { title: string; items: Invoice[] }[] = [
-      { title: 'Sot', items: [] },
-      { title: 'Këtë javë', items: [] },
-      { title: 'Më herët', items: [] },
+    const sections: { title: string; invoices: Invoice[] }[] = [
+      { title: 'Sot', invoices: [] },
+      { title: 'Këtë javë', invoices: [] },
+      { title: 'Më herët', invoices: [] },
     ];
-    filtered.forEach((i) => {
-      const d = daysSince(i.date);
-      g[d <= 0 ? 0 : d <= 6 ? 1 : 2].items.push(i);
+    filtered.forEach((invoice) => {
+      const age = daysSince(invoice.date);
+      sections[age <= 0 ? 0 : age <= 6 ? 1 : 2].invoices.push(invoice);
     });
-    return g.filter((x) => x.items.length > 0);
+    return sections.filter((section) => section.invoices.length > 0);
   }, [filtered]);
 
-  const overdue = useMemo(
-    () => sorted.filter((i) => i.status === 'overdue').sort((a, b) => (a.dueDate < b.dueDate ? -1 : 1))[0],
-    [sorted]
-  );
-  const overdueCustomer = overdue ? getCustomer(overdue.customerId) : undefined;
+  const overdueInvoice = sorted.find((invoice) => displayStatus(invoice) === 'overdue');
+  const overdueName = overdueInvoice
+    ? overdueInvoice.customerName ?? getCustomer(overdueInvoice.customerId)?.name ?? 'Klienti'
+    : '';
+
+  const markPaid = async (invoice: Invoice) => {
+    if (invoice.status === 'paid' || updatingId) return;
+    setUpdatingId(invoice.id);
+    try {
+      await invoiceService.updateInvoiceStatus(invoice.id, 'paid');
+      await refreshInvoices();
+    } catch (error) {
+      Alert.alert(
+        'Statusi nuk u ndryshua',
+        error instanceof Error ? error.message : 'Kontrollo lidhjen me Supabase dhe provo përsëri.'
+      );
+    } finally {
+      setUpdatingId(null);
+    }
+  };
 
   const sendReminder = async () => {
-    if (overdue && overdueCustomer) await shareReminder(overdue, overdueCustomer.name);
+    if (!overdueInvoice) return;
+    try {
+      await shareReminder(overdueInvoice, overdueName);
+    } catch (error) {
+      Alert.alert('Kujtesa nuk u dërgua', error instanceof Error ? error.message : 'Provo përsëri.');
+    }
   };
 
   return (
-    <Screen>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.titleRow}>
+    <Screen style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <View style={styles.header}>
           <Text style={styles.title}>Faturat</Text>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Pressable
-              style={styles.iconBtn}
-              onPress={() => {
-                setSearching((s) => !s);
-                setQuery('');
-              }}
-            >
-              <Feather name={searching ? 'x' : 'search'} size={19} color={colors.text} />
-            </Pressable>
-            <Pressable
-              style={[styles.iconBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}
-              onPress={() => router.push('/invoice/create')}
-            >
-              <Feather name="plus" size={20} color="#FFFFFF" />
-            </Pressable>
-          </View>
+          <Pressable
+            accessibilityLabel={searching ? 'Mbyll kërkimin' : 'Kërko faturë'}
+            style={styles.searchToggle}
+            onPress={() => {
+              setSearching((value) => !value);
+              setQuery('');
+            }}
+          >
+            <Feather name={searching ? 'x' : 'search'} size={19} color={INK} />
+          </Pressable>
         </View>
 
         {searching ? (
-          <View style={styles.search}>
-            <Feather name="search" size={18} color={colors.textMuted} />
+          <View style={styles.searchBox}>
+            <Feather name="search" size={17} color="#78716C" />
             <TextInput
               autoFocus
               value={query}
               onChangeText={setQuery}
-              placeholder="Kërko faturë, klient..."
-              placeholderTextColor={colors.textMuted}
+              placeholder="Kërko klient ose numër fature..."
+              placeholderTextColor="#A8A29E"
               style={styles.searchInput}
             />
           </View>
         ) : null}
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          <Chip label="Të gjitha" active={filter === 'all'} onPress={() => setFilter('all')} />
-          <Chip label={`Në pritje ${openCount}`} active={filter === 'open'} onPress={() => setFilter('open')} />
-          <Chip label={`Paguara ${paidCount}`} active={filter === 'paid'} onPress={() => setFilter('paid')} />
-        </ScrollView>
+        <View style={styles.filters}>
+          <FilterPill label="Të gjitha" selected={filter === 'all'} onPress={() => setFilter('all')} />
+          <FilterPill label={`Në pritje ${openCount}`} selected={filter === 'open'} onPress={() => setFilter('open')} />
+          <FilterPill label={`Paguar ${paidCount}`} selected={filter === 'paid'} onPress={() => setFilter('paid')} />
+        </View>
 
-        {overdue && overdueCustomer && filter !== 'paid' ? (
-          <View style={styles.alert}>
-            <View style={styles.alertIcon}>
-              <Feather name="zap" size={18} color="#FFFFFF" />
+        {overdueInvoice && filter !== 'paid' ? (
+          <View style={styles.reminder}>
+            <View style={styles.reminderIcon}><Feather name="zap" size={17} color={INK} /></View>
+            <View style={styles.reminderCopy}>
+              <Text style={styles.reminderTitle}>{overdueName} ka faturë të vonuar</Text>
+              <Text style={styles.reminderSub}>Dërgo një kujtesë për pagesën</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.alertTitle}>
-                {overdueCustomer.name.split(' ').pop()} nuk ka paguar {Math.max(daysSince(overdue.dueDate), 1)} ditë
-              </Text>
-              <Text style={styles.alertSub}>Kujtesa u përgatit nga AI</Text>
-            </View>
-            <Pressable style={styles.alertBtn} onPress={sendReminder}>
-              <Text style={styles.alertBtnText}>Dërgo</Text>
+            <Pressable onPress={() => void sendReminder()} style={styles.reminderButton}>
+              <Text style={styles.reminderButtonLabel}>Dërgo</Text>
             </Pressable>
           </View>
         ) : null}
 
         {invoicesError ? (
-          <Pressable onPress={() => void refreshInvoices()} style={styles.loadError}>
-            <Text style={styles.empty}>
-              Faturat nuk mund të ngarkoheshin nga Supabase. Prek për të provuar përsëri.
-            </Text>
+          <Pressable onPress={() => void refreshInvoices()} style={styles.notice}>
+            <Text style={styles.noticeText}>Faturat nuk mund të ngarkoheshin nga Supabase. Prek për të provuar përsëri.</Text>
           </Pressable>
         ) : invoicesLoading && invoices.length === 0 ? (
           <Text style={styles.empty}>Po ngarkohen faturat...</Text>
         ) : groups.length === 0 ? (
           <Text style={styles.empty}>Nuk u gjet asnjë faturë.</Text>
         ) : (
-          groups.map((g) => (
-            <View key={g.title}>
-              <Text style={styles.groupTitle}>{g.title}</Text>
-              {g.items.map((inv) => (
-                <InvoiceRow
-                  key={inv.id}
-                  invoice={inv}
-                  customerName={getCustomer(inv.customerId)?.name ?? 'Klient'}
-                  onPress={() => router.push(`../invoice/${inv.id}`)}
-                />
-              ))}
+          groups.map((group) => (
+            <View key={group.title}>
+              <Text style={styles.groupTitle}>{group.title}</Text>
+              {group.invoices.map((invoice) => {
+                const clientName = invoice.customerName ?? getCustomer(invoice.customerId)?.name ?? 'Klient';
+                const status = displayStatus(invoice);
+                return (
+                  <View key={invoice.id} style={styles.invoiceCard}>
+                    <Pressable
+                      onPress={() => router.push(`/invoice/${invoice.id}`)}
+                      style={styles.invoiceMain}
+                    >
+                      <View style={styles.avatar}>
+                        <Text style={styles.avatarText}>{getInitials(clientName) || 'K'}</Text>
+                      </View>
+                      <View style={styles.invoiceCopy}>
+                        <Text numberOfLines={1} style={styles.clientName}>{clientName}</Text>
+                        <Text numberOfLines={1} style={styles.serviceName}>{invoice.title}</Text>
+                        <Text style={styles.invoiceNumber}>#{invoice.number}</Text>
+                      </View>
+                      <Text style={styles.amount}>{formatMoney(getInvoiceTotal(invoice))}</Text>
+                    </Pressable>
+                    <View style={styles.cardFooter}>
+                      <Text style={styles.issuedDate}>{new Date(`${invoice.date}T12:00:00`).toLocaleDateString('sq-AL')}</Text>
+                      <Pressable
+                        disabled={invoice.status === 'paid' || updatingId === invoice.id}
+                        onPress={() => void markPaid(invoice)}
+                        style={[styles.statusPill, statusStyles[status]]}
+                      >
+                        <Text style={[styles.statusText, status === 'paid' && styles.paidText]}>
+                          {updatingId === invoice.id ? 'Po ruhet...' : statusLabel[status]}
+                        </Text>
+                        {invoice.status !== 'paid' ? <Feather name="check" size={12} color="#9A3412" /> : null}
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              })}
             </View>
           ))
         )}
@@ -166,56 +212,63 @@ export default function InvoicesScreen() {
   );
 }
 
+function FilterPill({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={[styles.filterPill, selected && styles.filterPillSelected]}>
+      <Text style={[styles.filterLabel, selected && styles.filterLabelSelected]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+const INK = '#1C1917';
+const ORANGE = '#FB923C';
 const styles = StyleSheet.create({
-  content: { padding: 20, paddingBottom: 32 },
-  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 28, fontWeight: '800', color: colors.text, letterSpacing: -0.5 },
-  iconBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  search: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    height: 48,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 14,
-    marginTop: 14,
-  },
-  searchInput: { flex: 1, fontSize: 15, color: colors.text },
-  chips: { gap: 8, paddingVertical: 16 },
-  alert: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: colors.alertBg,
-    borderRadius: radius.lg - 4,
-    padding: 12,
-    marginBottom: 6,
-  },
-  alertIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  alertTitle: { fontSize: 14, fontWeight: '800', color: colors.text },
-  alertSub: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  alertBtn: { backgroundColor: colors.dark, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
-  alertBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
-  groupTitle: { fontSize: 12, color: colors.textMuted, marginTop: 14, marginBottom: 8, fontWeight: '600' },
-  empty: { textAlign: 'center', color: colors.textMuted, marginTop: 40 },
-  loadError: { paddingVertical: 8 },
+  screen: { backgroundColor: '#FAF5EE' },
+  content: { padding: 20, paddingBottom: 36 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  title: { color: INK, fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
+  searchToggle: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 9, height: 46, marginTop: 14, paddingHorizontal: 13, borderRadius: 13, backgroundColor: '#FFFFFF' },
+  searchInput: { flex: 1, color: INK, fontSize: 13 },
+  filters: { flexDirection: 'row', gap: 8, paddingVertical: 17 },
+  filterPill: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 16, backgroundColor: '#FFFFFF' },
+  filterPillSelected: { backgroundColor: INK },
+  filterLabel: { color: '#78716C', fontWeight: '700', fontSize: 12 },
+  filterLabelSelected: { color: '#FFFFFF' },
+  reminder: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, marginBottom: 12, borderRadius: 16, backgroundColor: '#FFEDD5' },
+  reminderIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: ORANGE },
+  reminderCopy: { flex: 1 },
+  reminderTitle: { color: INK, fontSize: 12, fontWeight: '800' },
+  reminderSub: { color: '#78716C', fontSize: 11, marginTop: 3 },
+  reminderButton: { backgroundColor: INK, borderRadius: 10, paddingHorizontal: 13, paddingVertical: 9 },
+  reminderButtonLabel: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+  groupTitle: { color: '#78716C', fontSize: 12, fontWeight: '700', marginTop: 12, marginBottom: 8 },
+  invoiceCard: { padding: 14, marginBottom: 9, backgroundColor: '#FFFFFF', borderRadius: 17 },
+  invoiceMain: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFEDD5', alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#9A3412', fontSize: 13, fontWeight: '800' },
+  invoiceCopy: { flex: 1, minWidth: 0 },
+  clientName: { color: INK, fontSize: 14, fontWeight: '800' },
+  serviceName: { color: '#78716C', fontSize: 11, marginTop: 3 },
+  invoiceNumber: { color: '#A8A29E', fontSize: 10, marginTop: 3 },
+  amount: { color: INK, fontSize: 13, fontWeight: '800' },
+  cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F5F5F4' },
+  issuedDate: { color: '#A8A29E', fontSize: 10 },
+  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 12 },
+  status_pending: { backgroundColor: '#FFF7ED' },
+  status_overdue: { backgroundColor: '#FEF2F2' },
+  status_paid: { backgroundColor: '#ECFDF5' },
+  status_draft: { backgroundColor: '#F5F5F4' },
+  statusText: { color: '#9A3412', fontSize: 10, fontWeight: '700' },
+  paidText: { color: '#047857' },
+  empty: { textAlign: 'center', color: '#78716C', marginTop: 42, fontSize: 13 },
+  notice: { padding: 13, borderRadius: 12, backgroundColor: '#FEF2F2' },
+  noticeText: { color: '#991B1B', fontSize: 12, textAlign: 'center' },
 });
+
+const statusStyles: Record<InvoiceStatus, object> = {
+  pending: styles.status_pending,
+  overdue: styles.status_overdue,
+  paid: styles.status_paid,
+  draft: styles.status_draft,
+};

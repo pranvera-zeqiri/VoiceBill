@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { File } from 'expo-file-system';
 import type { Invoice, InvoiceItem, InvoiceStatus } from '@/types';
 
 type InvoiceItemInput = Pick<
@@ -17,6 +18,29 @@ export interface CreateInvoiceInput {
   fromVoice?: boolean;
   audioSeconds?: number;
   items: InvoiceItemInput[];
+}
+
+export interface ExtractedInvoiceItem {
+  name: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  total: number;
+}
+
+export interface ExtractedVoiceInvoice {
+  client_name: string;
+  service_summary: string;
+  hours_worked: number;
+  materials_cost: number;
+  items: ExtractedInvoiceItem[];
+  subtotal: number;
+  vat_rate: number;
+  vat_amount: number;
+  total: number;
+  transcript: string;
+  duration_formatted: string;
+  duration_seconds: number;
 }
 
 interface InvoiceItemRecord {
@@ -39,6 +63,7 @@ interface InvoiceRecord {
   vat_rate?: number | null;
   from_voice?: boolean | null;
   audio_seconds?: number | null;
+  customers?: { name?: string | null } | null;
   invoice_items?: InvoiceItemRecord[] | null;
 }
 
@@ -56,6 +81,7 @@ function mapInvoice(record: InvoiceRecord): Invoice {
     date: record.date,
     dueDate: record.due_date,
     status: record.status,
+    customerName: record.customers?.name ?? undefined,
     vatRate: record.vat_rate ?? 0,
     fromVoice: record.from_voice ?? undefined,
     audioSeconds: record.audio_seconds ?? undefined,
@@ -70,16 +96,94 @@ function mapInvoice(record: InvoiceRecord): Invoice {
   };
 }
 
+async function requireAuthenticatedUser() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  if (!data.session?.user) throw new Error('Duhet të kyçeni për të menaxhuar faturat.');
+  return data.session.user;
+}
+
+async function invokeVoiceFunction<T>(body: FormData | Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke<T>('voice-invoice', { body });
+  if (error) {
+    if (error.context instanceof Response) {
+      const payload = (await error.context.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(payload?.error ?? error.message);
+    }
+    if (error.name === 'FunctionsFetchError') {
+      const cause =
+        error.context instanceof Error
+          ? error.context.message
+          : typeof error.context === 'string'
+            ? error.context
+            : '';
+      console.error('Edge Function network request failed:', error.context);
+      throw new Error(
+        cause
+          ? `Nuk u lidh me Supabase Edge Function (${cause}). Kontrollo internetin dhe provo përsëri.`
+          : 'Nuk u lidh me Supabase Edge Function. Kontrollo internetin dhe provo përsëri.'
+      );
+    }
+    throw error;
+  }
+  if (!data) throw new Error('Supabase Edge Function nuk ktheu përgjigje.');
+  return data;
+}
+
 export const invoiceService = {
+  async transcribeAudioSegment(audioUri: string): Promise<string> {
+    const audioFile = new File(audioUri);
+    if (!audioFile.exists || audioFile.size === 0) return '';
+
+    const formData = new FormData();
+    formData.append('audio', audioFile, audioFile.name || 'voice-segment.m4a');
+    formData.append('transcribe_only', 'true');
+    const data = await invokeVoiceFunction<{ transcript?: string }>(formData);
+    if (typeof data.transcript !== 'string') {
+      throw new Error('Supabase Edge Function ktheu transkript të pavlefshëm.');
+    }
+    return data.transcript.trim();
+  },
+
+  async extractInvoiceFromTranscript(
+    transcript: string,
+    durationSeconds: number
+  ): Promise<ExtractedVoiceInvoice> {
+    const data = await invokeVoiceFunction<ExtractedVoiceInvoice>({
+      extract_only: true,
+      transcript,
+      duration_seconds: Math.max(0, Math.floor(durationSeconds)),
+    });
+    if (!Array.isArray(data.items) || typeof data.transcript !== 'string') {
+      throw new Error('Supabase Edge Function ktheu të dhëna të pavlefshme. Kontrollo deploy-in e voice-invoice.');
+    }
+    return data;
+  },
+
+  async transcribeAndExtractInvoice(audioUri: string, durationSeconds: number): Promise<ExtractedVoiceInvoice> {
+    const audioFile = new File(audioUri);
+    if (!audioFile.exists || audioFile.size === 0) {
+      throw new Error('Skedari i regjistrimit nuk ekziston ose është bosh. Regjistroje përsëri.');
+    }
+
+    const formData = new FormData();
+    formData.append('audio', audioFile, audioFile.name || 'voice-invoice.m4a');
+    formData.append('duration_seconds', String(Math.max(0, Math.floor(durationSeconds))));
+
+    const data = await invokeVoiceFunction<ExtractedVoiceInvoice>(formData);
+    if (!data || !Array.isArray(data.items) || typeof data.transcript !== 'string') {
+      throw new Error('Supabase Edge Function ktheu të dhëna të pavlefshme. Kontrollo deploy-in e voice-invoice.');
+    }
+    return data;
+  },
+
   async getInvoices(): Promise<Invoice[]> {
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError) throw authError;
-    if (!authData.user) throw new Error('Përdoruesi nuk është i kyçur.');
+    const user = await requireAuthenticatedUser();
 
     const { data, error } = await supabase
       .from('invoices')
-      .select('*, invoice_items(*)')
-      .eq('user_id', authData.user.id)
+      .select('*, invoice_items(*), customers(name)')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -104,9 +208,7 @@ export const invoiceService = {
 
   async createInvoice(invoiceData: CreateInvoiceInput): Promise<Invoice> {
     try {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Përdoruesi nuk është i kyçur.');
+      const user = await requireAuthenticatedUser();
 
       const { items, customerId, dueDate, vatRate, fromVoice, audioSeconds, ...invoiceFields } =
         invoiceData;
@@ -119,7 +221,7 @@ export const invoiceService = {
           vat_rate: vatRate,
           from_voice: fromVoice,
           audio_seconds: audioSeconds,
-          user_id: authData.user.id,
+          user_id: user.id,
         })
         .select()
         .single();
@@ -171,6 +273,65 @@ export const invoiceService = {
       console.error('SUPABASE_ERROR:', JSON.stringify(error, null, 2));
       throw error;
     }
+  },
+
+  async createVoiceInvoice(
+    draft: ExtractedVoiceInvoice,
+    items: InvoiceItemInput[]
+  ): Promise<Invoice> {
+    const user = await requireAuthenticatedUser();
+
+    const clientName = draft.client_name.trim();
+    if (!clientName) throw new Error('AI nuk e identifikoi klientin. Plotëso emrin e klientit.');
+    if (!items.length) throw new Error('Shto të paktën një zë faturë para ruajtjes.');
+
+    const { data: existingCustomer, error: customerLookupError } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('name', clientName)
+      .maybeSingle();
+    if (customerLookupError) throw customerLookupError;
+
+    let customerId = existingCustomer?.id;
+    if (!customerId) {
+      const { data: newCustomer, error: customerInsertError } = await supabase
+        .from('customers')
+        .insert({
+          user_id: user.id,
+          name: clientName,
+          phone: '',
+          email: '',
+          address: '',
+        })
+        .select('id')
+        .single();
+      if (customerInsertError) throw customerInsertError;
+      customerId = newCustomer.id;
+    }
+
+    const { data: latestInvoice, error: numberError } = await supabase
+      .from('invoices')
+      .select('number')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (numberError) throw numberError;
+    const nextNumber = Math.max(0, Number(latestInvoice?.number) || 0) + 1;
+
+    return this.createInvoice({
+      customerId: String(customerId),
+      number: String(nextNumber).padStart(4, '0'),
+      title: draft.service_summary.trim() || items[0].title,
+      date: new Date().toISOString().slice(0, 10),
+      dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+      status: 'pending',
+      vatRate: draft.vat_rate,
+      fromVoice: true,
+      audioSeconds: draft.duration_seconds,
+      items,
+    });
   },
 
   async updateInvoiceStatus(invoiceId: string, status: 'draft' | 'pending' | 'paid' | 'overdue') {

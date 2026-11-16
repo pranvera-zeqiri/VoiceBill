@@ -1,3 +1,33 @@
+do $$
+declare
+  missing_columns text[];
+begin
+  if to_regclass('public.customers') is null then
+    raise exception
+      'Cannot create invoice tables: public.customers does not exist. Create the customers table first.';
+  end if;
+
+  select array_agg(required.column_name)
+  into missing_columns
+  from (
+    values ('id'), ('user_id'), ('name'), ('phone'), ('email'), ('address'), ('created_at')
+  ) as required(column_name)
+  where not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'customers'
+      and column_name = required.column_name
+  );
+
+  if missing_columns is not null then
+    raise exception
+      'Cannot create invoice tables: public.customers is missing required columns: %',
+      array_to_string(missing_columns, ', ');
+  end if;
+end
+$$;
+
 create table if not exists public.invoices (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -160,7 +190,8 @@ alter table public.invoice_items
   alter column quantity set not null,
   alter column unit_price set not null,
   alter column unit set not null,
-  alter column needs_confirm set not null;
+  alter column needs_confirm set not null,
+  alter column created_at set default now();
 
 do $$
 begin

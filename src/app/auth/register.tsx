@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import {
+    Alert,
     KeyboardAvoidingView,
     Platform,
     Pressable,
@@ -48,12 +49,20 @@ export default function RegisterScreen() {
     if (Object.keys(next).length > 0) return;
 
     setLoading(true);
-    await register(
-      { fullName: fullName.trim(), businessName: businessName.trim(), email: email.trim() },
-      password
-    );
-    setLoading(false);
-    router.replace('/tabs');
+    try {
+      await register(
+        { fullName: fullName.trim(), businessName: businessName.trim(), email: email.trim() },
+        password
+      );
+      router.replace('/tabs');
+    } catch (error) {
+      Alert.alert(
+        'Regjistrimi dështoi',
+        error instanceof Error ? error.message : 'Kontrollo lidhjen dhe të dhënat e regjistrimit.'
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

@@ -31,10 +31,10 @@ function mapCustomer(record: CustomerRecord): Customer {
 }
 
 async function requireAuthenticatedUser() {
-  const { data, error } = await supabase.auth.getUser();
+  const { data, error } = await supabase.auth.getSession();
   if (error) throw error;
-  if (!data.user) throw new Error('Duhet të kyçeni për të menaxhuar klientët.');
-  return data.user;
+  if (!data.session?.user) throw new Error('Duhet të kyçeni për të menaxhuar klientët.');
+  return data.session.user;
 }
 
 export const customerService = {

@@ -67,7 +67,7 @@ export function TabBar({ state, descriptors, emitter, navigateToTab }: BottomTab
 
       <View style={styles.fabSlot}>
         <Pressable
-          onPress={() => router.push('./voice')}
+          onPress={() => router.push('/invoice')}
           style={({ pressed }) => [styles.fab, pressed && { transform: [{ scale: 0.95 }] }]}
         >
           <Feather name="mic" size={26} color="#FFFFFF" />

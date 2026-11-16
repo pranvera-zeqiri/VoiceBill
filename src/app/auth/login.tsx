@@ -36,9 +36,17 @@ export default function LoginScreen() {
     if (Object.keys(next).length > 0) return;
 
     setLoading(true);
-    await login(email.trim(), password);
-    setLoading(false);
-    router.replace('/tabs');
+    try {
+      await login(email.trim(), password);
+      router.replace('/tabs');
+    } catch (error) {
+      Alert.alert(
+        'Hyrja dështoi',
+        error instanceof Error ? error.message : 'Kontrollo lidhjen dhe të dhënat e hyrjes.'
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

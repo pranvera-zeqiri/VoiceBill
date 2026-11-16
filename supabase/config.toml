@@ -1,0 +1,2 @@
+[functions.voice-invoice]
+verify_jwt = true
