@@ -4,8 +4,9 @@ import { Header } from '@/components/Header';
 import { InvoiceRow } from '@/components/InvoiceRow';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
-import { colors, radius, shadow } from '@/constants/theme';
+import { radius, shadow } from '@/constants/theme';
 import { useApp } from '@/context/AppContext';
+import { useAppTheme } from '@/components/useAppTheme';
 import { FeatherName } from '@/types';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -16,6 +17,7 @@ export default function CustomerDetailsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getCustomer, getCustomerStats, invoices } = useApp();
+  const { colors } = useAppTheme();
 
   const customer = getCustomer(id);
   const stats = getCustomerStats(id);
@@ -32,7 +34,7 @@ export default function CustomerDetailsScreen() {
     return (
       <Screen edges={['top', 'bottom']}>
         <Header title="Klienti" />
-        <Text style={styles.notFound}>Klienti nuk u gjet.</Text>
+        <Text style={[styles.notFound, { color: colors.textMuted }]}>Klienti nuk u gjet.</Text>
       </Screen>
     );
   }
@@ -66,20 +68,20 @@ export default function CustomerDetailsScreen() {
           onNewJob={() => router.push('/voice')}
         />
 
-        <View style={styles.contactCard}>
+        <View style={[styles.contactCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {contact.map((c, idx) => (
             <Pressable
               key={c.label}
               onPress={c.onPress}
               disabled={!c.onPress}
-              style={[styles.contactRow, idx > 0 && styles.contactBorder]}
+              style={[styles.contactRow, idx > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
             >
-              <View style={styles.contactIcon}>
+              <View style={[styles.contactIcon, { backgroundColor: colors.primarySoft }]}>
                 <Feather name={c.icon} size={16} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.contactLabel}>{c.label}</Text>
-                <Text style={styles.contactValue}>{c.value}</Text>
+                <Text style={[styles.contactLabel, { color: colors.textMuted }]}>{c.label}</Text>
+                <Text style={[styles.contactValue, { color: colors.text }]}>{c.value}</Text>
               </View>
               {c.onPress ? <Feather name="chevron-right" size={18} color={colors.textMuted} /> : null}
             </Pressable>
@@ -88,7 +90,7 @@ export default function CustomerDetailsScreen() {
 
         <SectionHeader title="Faturat" />
         {customerInvoices.length === 0 ? (
-          <Text style={styles.empty}>Ky klient nuk ka ende fatura.</Text>
+          <Text style={[styles.empty, { color: colors.textMuted }]}>Ky klient nuk ka ende fatura.</Text>
         ) : (
           customerInvoices.map((inv) => (
             <InvoiceRow
@@ -114,26 +116,22 @@ export default function CustomerDetailsScreen() {
 
 const styles = StyleSheet.create({
   content: { padding: 20, paddingTop: 8, paddingBottom: 32 },
-  notFound: { textAlign: 'center', marginTop: 60, color: colors.textMuted },
+  notFound: { textAlign: 'center', marginTop: 60 },
   contactCard: {
-    backgroundColor: colors.surface,
     borderRadius: radius.lg - 4,
     borderWidth: 1,
-    borderColor: colors.border,
     marginTop: 14,
     ...shadow,
   },
   contactRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
-  contactBorder: { borderTopWidth: 1, borderTopColor: colors.border },
   contactIcon: {
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  contactLabel: { fontSize: 11, color: colors.textMuted },
-  contactValue: { fontSize: 14, fontWeight: '600', color: colors.text, marginTop: 2 },
-  empty: { color: colors.textMuted, textAlign: 'center', marginVertical: 16 },
+  contactLabel: { fontSize: 11 },
+  contactValue: { fontSize: 14, fontWeight: '600', marginTop: 2 },
+  empty: { textAlign: 'center', marginVertical: 16 },
 });

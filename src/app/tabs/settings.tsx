@@ -5,15 +5,17 @@ import { Input } from '@/components/Input';
 import { Screen } from '@/components/Screen';
 import { colors, radius, shadow } from '@/constants/theme';
 import { useApp } from '@/context/AppContext';
+import { useAppTheme } from '@/components/useAppTheme';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 const VAT_OPTIONS = [0, 8, 18];
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { user, updateUser, settings, updateSettings, logout } = useApp();
+  const { user, updateUser, settings, updateSettings, logout, darkMode, updateDarkMode } = useApp();
+  const { colors } = useAppTheme();
 
   const [fullName, setFullName] = useState(user?.fullName ?? '');
   const [businessName, setBusinessName] = useState(user?.businessName ?? '');
@@ -22,6 +24,23 @@ export default function SettingsScreen() {
   const [bankName, setBankName] = useState(user?.bankName ?? '');
   const [iban, setIban] = useState(user?.iban ?? '');
   const [savingProfile, setSavingProfile] = useState(false);
+  const loadedProfileEmail = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      loadedProfileEmail.current = null;
+      return;
+    }
+    if (loadedProfileEmail.current === user.email) return;
+
+    loadedProfileEmail.current = user.email;
+    setFullName(user.fullName);
+    setBusinessName(user.businessName);
+    setPhone(user.phone);
+    setTaxId(user.taxId);
+    setBankName(user.bankName);
+    setIban(user.iban);
+  }, [user]);
 
   const save = async () => {
     if (fullName.trim().length < 2 || businessName.trim().length < 2) {
@@ -69,19 +88,19 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.title}>Profili</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Profili</Text>
 
-        <View style={styles.profile}>
+        <View style={[styles.profile, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Avatar name={user?.fullName ?? 'VB'} size={56} variant="dark" />
           <View style={{ flex: 1 }}>
-            <Text style={styles.name}>{user?.fullName}</Text>
-            <Text style={styles.sub}>{user?.businessName}</Text>
-            <Text style={styles.sub}>{user?.email}</Text>
+            <Text style={[styles.name, { color: colors.text }]}>{user?.fullName}</Text>
+            <Text style={[styles.sub, { color: colors.textMuted }]}>{user?.businessName}</Text>
+            <Text style={[styles.sub, { color: colors.textMuted }]}>{user?.email}</Text>
           </View>
         </View>
 
-        <Text style={styles.section}>Të dhënat e biznesit</Text>
-        <View style={styles.card}>
+        <Text style={[styles.section, { color: colors.text }]}>Të dhënat e biznesit</Text>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Input label="Emri i plotë" value={fullName} onChangeText={setFullName} />
           <Input label="Emri i biznesit" value={businessName} onChangeText={setBusinessName} />
           <Input label="Telefoni" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
@@ -98,15 +117,15 @@ export default function SettingsScreen() {
           <Button label="Ruaj ndryshimet" onPress={() => void save()} loading={savingProfile} />
         </View>
 
-        <Text style={styles.section}>Faturimi</Text>
-        <View style={styles.card}>
+        <Text style={[styles.section, { color: colors.text }]}>Faturimi</Text>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <SwitchRow
             title="Shto TVA automatikisht"
             sub="Zbatohet në faturat e reja"
             value={settings.autoVat}
             onChange={(v) => updateSettings({ autoVat: v })}
           />
-          <Text style={styles.fieldLabel}>Norma e TVA-së</Text>
+          <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Norma e TVA-së</Text>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {VAT_OPTIONS.map((v) => (
               <Chip
@@ -119,35 +138,49 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        <Text style={styles.section}>Preferencat</Text>
-        <View style={styles.card}>
+        <Text style={[styles.section, { color: colors.text }]}>Preferencat</Text>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <SwitchRow
+            title="Dark Mode"
+            sub="Sfond gradient blu i errët"
+            value={darkMode}
+            onChange={(value) => {
+              void updateDarkMode(value).catch((error: unknown) => {
+                Alert.alert(
+                  'Tema nuk u ruajt',
+                  error instanceof Error ? error.message : 'Provo përsëri.'
+                );
+              });
+            }}
+          />
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <SwitchRow
             title="Njoftimet"
             sub="Merr njoftime për pagesat"
             value={settings.notifications}
             onChange={(v) => updateSettings({ notifications: v })}
           />
-          <View style={styles.divider} />
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <SwitchRow
             title="Kujtesa automatike"
             sub="AI përgatit kujtesë për faturat e vonuara"
             value={settings.autoReminders}
             onChange={(v) => updateSettings({ autoReminders: v })}
           />
-          <View style={styles.divider} />
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.infoRow}>
-            <Text style={styles.rowTitle}>Gjuha</Text>
-            <Text style={styles.infoValue}>Shqip</Text>
+            <Text style={[styles.rowTitle, { color: colors.text }]}>Gjuha</Text>
+            <Text style={[styles.infoValue, { color: colors.textMuted }]}>Shqip</Text>
           </View>
-          <View style={styles.divider} />
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.infoRow}>
-            <Text style={styles.rowTitle}>Valuta</Text>
-            <Text style={styles.infoValue}>Euro (€)</Text>
+            <Text style={[styles.rowTitle, { color: colors.text }]}>Valuta</Text>
+            <Text style={[styles.infoValue, { color: colors.textMuted }]}>Euro (€)</Text>
           </View>
         </View>
 
         <Button label="Dil nga llogaria" icon="log-out" variant="danger" onPress={onLogout} style={{ marginTop: 24 }} />
-        <Text style={styles.version}>VoiceBill v1.0.0 · MVP</Text>
+        <Text style={[styles.version, { color: colors.textMuted }]}>VoiceBill v1.0.0 · MVP</Text>
       </ScrollView>
     </Screen>
   );
@@ -164,11 +197,12 @@ function SwitchRow({
   value: boolean;
   onChange: (v: boolean) => void;
 }) {
+  const { colors } = useAppTheme();
   return (
     <View style={styles.switchRow}>
       <View style={{ flex: 1, paddingRight: 12 }}>
-        <Text style={styles.rowTitle}>{title}</Text>
-        <Text style={styles.rowSub}>{sub}</Text>
+        <Text style={[styles.rowTitle, { color: colors.text }]}>{title}</Text>
+        <Text style={[styles.rowSub, { color: colors.textMuted }]}>{sub}</Text>
       </View>
       <Switch
         value={value}

@@ -5,6 +5,7 @@ import { Input } from '@/components/Input';
 import { Screen } from '@/components/Screen';
 import { colors, radius, shadow } from '@/constants/theme';
 import { useApp } from '@/context/AppContext';
+import { useAppTheme } from '@/components/useAppTheme';
 import { InvoiceItem } from '@/types';
 import { calcTotals, formatMoney, uid } from '@/utils/format';
 import { Feather } from '@expo/vector-icons';
@@ -37,6 +38,7 @@ export default function CreateInvoiceScreen() {
   const router = useRouter();
   const { customerId: paramCustomer } = useLocalSearchParams<{ customerId?: string }>();
   const { customers, settings, addInvoice } = useApp();
+  const { colors } = useAppTheme();
 
   const [customerId, setCustomerId] = useState<string>(paramCustomer ?? customers[0]?.id ?? '');
   const [title, setTitle] = useState('');
@@ -109,7 +111,7 @@ export default function CreateInvoiceScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.section}>Klienti</Text>
+          <Text style={[styles.section, { color: colors.text }]}>Klienti</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingBottom: 6 }}>
             {customers.map((c) => {
               const active = c.id === selectedCustomerId;
@@ -117,10 +119,14 @@ export default function CreateInvoiceScreen() {
                 <Pressable
                   key={c.id}
                   onPress={() => setCustomerId(c.id)}
-                  style={[styles.customerChip, active && styles.customerChipActive]}
+                  style={[
+                    styles.customerChip,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    active && { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+                  ]}
                 >
                   <Avatar name={c.name} size={32} variant={active ? 'dark' : 'light'} />
-                  <Text style={styles.customerName}>{c.name}</Text>
+                  <Text style={[styles.customerName, { color: colors.text }]}>{c.name}</Text>
                 </Pressable>
               );
             })}
@@ -134,11 +140,11 @@ export default function CreateInvoiceScreen() {
             onChangeText={setTitle}
           />
 
-          <Text style={styles.section}>Zërat e fatures</Text>
+          <Text style={[styles.section, { color: colors.text }]}>Zërat e fatures</Text>
           {items.map((it, idx) => (
-            <View key={it.id} style={styles.itemCard}>
+            <View key={it.id} style={[styles.itemCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={styles.itemHeader}>
-                <Text style={styles.itemIndex}>Zëri {idx + 1}</Text>
+                <Text style={[styles.itemIndex, { color: colors.textMuted }]}>Zëri {idx + 1}</Text>
                 {items.length > 1 ? (
                   <Pressable onPress={() => setItems((p) => p.filter((x) => x.id !== it.id))} hitSlop={10}>
                     <Feather name="trash-2" size={17} color={colors.danger} />
@@ -174,10 +180,10 @@ export default function CreateInvoiceScreen() {
             onPress={() => setItems((p) => [...p, emptyItem()])}
           />
 
-          <View style={styles.vatRow}>
+          <View style={[styles.vatRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View>
-              <Text style={styles.vatTitle}>TVA {settings.vatRate}%</Text>
-              <Text style={styles.vatSub}>Shto TVA në total</Text>
+              <Text style={[styles.vatTitle, { color: colors.text }]}>TVA {settings.vatRate}%</Text>
+              <Text style={[styles.vatSub, { color: colors.textMuted }]}>Shto TVA në total</Text>
             </View>
             <Switch
               value={vatOn}
@@ -187,7 +193,7 @@ export default function CreateInvoiceScreen() {
             />
           </View>
 
-          <View style={styles.totals}>
+          <View style={[styles.totals, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Row label="Nëntotali" value={formatMoney(totals.subtotal)} />
             {vatRate > 0 ? <Row label={`TVA ${vatRate}%`} value={formatMoney(totals.vat)} /> : null}
             <View style={styles.totalRow}>
@@ -198,7 +204,7 @@ export default function CreateInvoiceScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
         <Button label="Ruaj" variant="outline" loading={saving} onPress={() => void save('draft')} style={{ flex: 1 }} />
         <Button label="Ruaj dhe shiko" loading={saving} onPress={() => void save('pending')} style={{ flex: 1.4 }} />
       </View>
@@ -207,17 +213,18 @@ export default function CreateInvoiceScreen() {
 }
 
 function Row({ label, value }: { label: string; value: string }) {
+  const { colors } = useAppTheme();
   return (
     <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{value}</Text>
+      <Text style={[styles.rowLabel, { color: colors.textMuted }]}>{label}</Text>
+      <Text style={[styles.rowValue, { color: colors.textMuted, fontVariant: ['tabular-nums'] }]}>{value}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 24 },
-  section: { fontSize: 15, fontWeight: '800', color: colors.text, marginBottom: 10, marginTop: 4 },
+  section: { fontSize: 15, fontWeight: '800', marginBottom: 10, marginTop: 4 },
   customerChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -231,7 +238,7 @@ const styles = StyleSheet.create({
     paddingRight: 14,
   },
   customerChipActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  customerName: { fontSize: 13, fontWeight: '700', color: colors.text },
+  customerName: { fontSize: 13, fontWeight: '700' },
   itemCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg - 4,
@@ -242,7 +249,7 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   itemHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  itemIndex: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
+  itemIndex: { fontSize: 12, fontWeight: '700' },
   vatRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -254,8 +261,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  vatTitle: { fontSize: 14, fontWeight: '700', color: colors.text },
-  vatSub: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  vatTitle: { fontSize: 14, fontWeight: '700' },
+  vatSub: { fontSize: 12, marginTop: 2 },
   totals: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg - 4,
@@ -284,6 +291,5 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    backgroundColor: colors.background,
   },
 });

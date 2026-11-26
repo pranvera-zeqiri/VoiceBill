@@ -1,4 +1,5 @@
-import { colors, radius } from '@/constants/theme';
+import { radius } from '@/constants/theme';
+import { useAppTheme } from '@/components/useAppTheme';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
 interface Props {
@@ -8,13 +9,14 @@ interface Props {
 }
 
 export function Chip({ label, active, onPress }: Props) {
+  const { colors } = useAppTheme();
   return (
     <Pressable
       onPress={onPress}
       style={[
         styles.chip,
         active
-          ? { backgroundColor: colors.dark, borderColor: colors.dark }
+          ? { backgroundColor: colors.primary, borderColor: colors.primary }
           : { backgroundColor: colors.surface, borderColor: colors.border },
       ]}
     >

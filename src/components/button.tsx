@@ -1,4 +1,5 @@
-import { colors, radius } from '@/constants/theme';
+import { radius } from '@/constants/theme';
+import { useAppTheme } from '@/components/useAppTheme';
 import { FeatherName } from '@/types';
 import { Feather } from '@expo/vector-icons';
 import { ActivityIndicator, Pressable, StyleProp, StyleSheet, Text, ViewStyle } from 'react-native';
@@ -15,14 +16,6 @@ interface Props {
   style?: StyleProp<ViewStyle>;
 }
 
-const VARIANTS: Record<Variant, { bg: string; fg: string; border: string }> = {
-  primary: { bg: colors.primary, fg: '#FFFFFF', border: colors.primary },
-  dark: { bg: colors.dark, fg: '#FFFFFF', border: colors.dark },
-  outline: { bg: colors.surface, fg: colors.text, border: colors.border },
-  ghost: { bg: 'transparent', fg: colors.primary, border: 'transparent' },
-  danger: { bg: colors.dangerSoft, fg: colors.danger, border: colors.dangerSoft },
-};
-
 export function Button({
   label,
   onPress,
@@ -32,7 +25,15 @@ export function Button({
   disabled,
   style,
 }: Props) {
-  const v = VARIANTS[variant];
+  const { colors } = useAppTheme();
+  const variants: Record<Variant, { bg: string; fg: string; border: string }> = {
+    primary: { bg: colors.primary, fg: '#FFFFFF', border: colors.primary },
+    dark: { bg: colors.dark, fg: '#FFFFFF', border: colors.dark },
+    outline: { bg: colors.surface, fg: colors.text, border: colors.border },
+    ghost: { bg: 'transparent', fg: colors.primary, border: 'transparent' },
+    danger: { bg: colors.dangerSoft, fg: colors.danger, border: colors.dangerSoft },
+  };
+  const v = variants[variant];
   return (
     <Pressable
       onPress={onPress}

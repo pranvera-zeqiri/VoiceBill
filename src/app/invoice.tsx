@@ -1,5 +1,7 @@
 import { invoiceService } from '@/services/invoiceService';
 import { useApp } from '@/context/AppContext';
+import { Screen } from '@/components/Screen';
+import { useAppTheme } from '@/components/useAppTheme';
 import { Feather } from '@expo/vector-icons';
 import {
   RecordingPresets,
@@ -20,7 +22,6 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ORANGE = '#FB923C';
 const BAR_COUNT = 35;
@@ -34,6 +35,7 @@ function formatTimer(seconds: number) {
 export default function VoiceInvoiceScreen() {
   const router = useRouter();
   const { refreshInvoices } = useApp();
+  const { colors, darkMode } = useAppTheme();
   const mountedRef = useRef(true);
   const processingRef = useRef(false);
   const chunkingRef = useRef(false);
@@ -293,27 +295,31 @@ export default function VoiceInvoiceScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-      <StatusBar style="light" />
+    <Screen style={styles.screen} edges={['top', 'bottom']}>
+      <StatusBar style={darkMode ? 'light' : 'dark'} />
       <View style={styles.header}>
-        <Pressable accessibilityLabel="Kthehu" onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backGlyph}>&lt;</Text>
+        <Pressable
+          accessibilityLabel="Kthehu"
+          onPress={() => router.back()}
+          style={[styles.backButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        >
+          <Text style={[styles.backGlyph, { color: colors.text }]}>&lt;</Text>
         </Pressable>
         <View style={styles.headerText}>
-          <Text style={styles.title}>Regjistro punën</Text>
-          <Text style={styles.subtitle}>Fol natyrshëm, AI e rregullon vetë.</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Regjistro punën</Text>
+          <Text style={[styles.subtitle, { color: colors.textMuted }]}>Fol natyrshëm, AI e rregullon vetë.</Text>
         </View>
-        <View style={styles.timer}>
+        <View style={[styles.timer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={[styles.timerDot, paused && styles.pausedDot]} />
-          <Text style={styles.timerText}>{formatTimer(timerSeconds)}</Text>
+          <Text style={[styles.timerText, { color: colors.text }]}>{formatTimer(timerSeconds)}</Text>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-        <View style={styles.transcriptCard}>
+        <View style={[styles.transcriptCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.cardHeading}>
             <View style={[styles.liveDot, paused && styles.pausedDot]} />
-            <Text style={styles.cardHeadingText}>
+            <Text style={[styles.cardHeadingText, { color: colors.textMuted }]}>
               {recording
                 ? paused
                   ? 'Në pauzë'
@@ -323,7 +329,7 @@ export default function VoiceInvoiceScreen() {
                 : 'Transkripti'}
             </Text>
           </View>
-          <Text style={styles.transcriptText}>
+          <Text style={[styles.transcriptText, { color: colors.text }]}>
             {liveTranscript ||
               (transcriptionError
                 ? 'Disa fjalë nuk u njohën ende. Vazhdo të flasësh; AI do të provojë me segmentet pasuese.'
@@ -333,7 +339,7 @@ export default function VoiceInvoiceScreen() {
 
         <View style={styles.aiHeading}>
           <Text style={styles.sparkle}>✦</Text>
-          <Text style={styles.aiLabel}>
+          <Text style={[styles.aiLabel, { color: colors.textMuted }]}>
             {transcriptionPending ? '✦ AI po shkruan atë që po thua' : '✦ Transkriptim live me AI'}
           </Text>
         </View>
@@ -359,10 +365,10 @@ export default function VoiceInvoiceScreen() {
           <Pressable
             accessibilityLabel={paused ? 'Vazhdo regjistrimin' : 'Pauzo regjistrimin'}
             disabled={!recording || processing}
-            style={[styles.sideButton, (!recording || processing) && styles.disabled]}
+            style={[styles.sideButton, { backgroundColor: colors.surface, borderColor: colors.border }, (!recording || processing) && styles.disabled]}
             onPress={() => void togglePause()}
           >
-            <Feather name={paused ? 'play' : 'pause'} size={20} color="#FFFFFF" />
+            <Feather name={paused ? 'play' : 'pause'} size={20} color={colors.text} />
           </Pressable>
           <Pressable
             accessibilityLabel="Përfundo regjistrimin"
@@ -381,17 +387,17 @@ export default function VoiceInvoiceScreen() {
           <Pressable
             accessibilityLabel="Anulo regjistrimin"
             disabled={processing}
-            style={[styles.sideButton, processing && styles.disabled]}
+            style={[styles.sideButton, { backgroundColor: colors.surface, borderColor: colors.border }, processing && styles.disabled]}
             onPress={() => void cancel()}
           >
-            <Feather name="x" size={21} color="#FFFFFF" />
+            <Feather name="x" size={21} color={colors.text} />
           </Pressable>
         </View>
-        <Text style={styles.caption}>
+        <Text style={[styles.caption, { color: colors.textMuted }]}>
           {processing ? 'Duke hapur faturën...' : 'Prek për të përfunduar'}
         </Text>
       </View>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
@@ -404,26 +410,26 @@ function Chip({ label }: { label: string }) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#141312' },
+  screen: { backgroundColor: 'transparent' },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 18 },
-  backButton: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#1C1917', alignItems: 'center', justifyContent: 'center' },
-  backGlyph: { color: '#FFFFFF', fontSize: 24, lineHeight: 27 },
+  backButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  backGlyph: { fontSize: 24, lineHeight: 27 },
   headerText: { flex: 1 },
-  title: { color: '#FFFFFF', fontSize: 19, fontWeight: '800' },
-  subtitle: { color: '#A8A29E', fontSize: 11, marginTop: 3 },
-  timer: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#1C1917', borderRadius: 18, paddingHorizontal: 10, paddingVertical: 8 },
+  title: { fontSize: 19, fontWeight: '800' },
+  subtitle: { fontSize: 11, marginTop: 3 },
+  timer: { flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 18, paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1 },
   timerDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#EF4444' },
   pausedDot: { backgroundColor: '#78716C' },
-  timerText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  timerText: { fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
   body: { paddingHorizontal: 20, paddingBottom: 12 },
-  transcriptCard: { minHeight: 200, padding: 18, borderWidth: 1, borderColor: '#292524', borderRadius: 20, backgroundColor: '#1C1917' },
+  transcriptCard: { minHeight: 200, padding: 18, borderWidth: 1, borderRadius: 20 },
   cardHeading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: ORANGE },
-  cardHeadingText: { color: '#D6D3D1', fontSize: 12, fontWeight: '600' },
-  transcriptText: { color: '#E7E5E4', fontSize: 16, lineHeight: 25 },
+  cardHeadingText: { fontSize: 12, fontWeight: '600' },
+  transcriptText: { fontSize: 16, lineHeight: 25 },
   aiHeading: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 20, marginBottom: 10 },
   sparkle: { color: ORANGE, fontSize: 16 },
-  aiLabel: { color: '#A8A29E', fontSize: 13, fontWeight: '600' },
+  aiLabel: { fontSize: 13, fontWeight: '600' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { paddingHorizontal: 12, paddingVertical: 9, backgroundColor: '#1C1917', borderRadius: 14, borderWidth: 1, borderColor: '#292524' },
   chipText: { color: '#E7E5E4', fontSize: 12, fontWeight: '600' },
@@ -431,9 +437,9 @@ const styles = StyleSheet.create({
   waveform: { height: 76, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 3 },
   waveBar: { width: 3, borderRadius: 3, backgroundColor: ORANGE },
   controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 30, marginTop: 12 },
-  sideButton: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#292524', alignItems: 'center', justifyContent: 'center' },
+  sideButton: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   disabled: { opacity: 0.55 },
   stopOuter: { width: 104, height: 104, borderRadius: 52, borderWidth: 2, borderColor: 'rgba(251,146,60,0.35)', backgroundColor: 'rgba(251,146,60,0.13)', alignItems: 'center', justifyContent: 'center' },
   stopInner: { width: 80, height: 80, borderRadius: 40, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center' },
-  caption: { color: '#A8A29E', textAlign: 'center', fontSize: 12, marginTop: 12 },
+  caption: { textAlign: 'center', fontSize: 12, marginTop: 12 },
 });

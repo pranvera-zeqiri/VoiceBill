@@ -2,8 +2,8 @@ import { Button } from '@/components/button';
 import { CustomerRow } from '@/components/CostumerRow';
 import { Input } from '@/components/Input';
 import { Screen } from '@/components/Screen';
-import { colors } from '@/constants/theme';
 import { useApp } from '@/context/AppContext';
+import { useAppTheme } from '@/components/useAppTheme';
 import { Feather } from '@expo/vector-icons';
 import { useState } from 'react';
 import {
@@ -20,6 +20,7 @@ import {
 
 export default function CustomersScreen() {
   const { customers, getCustomerStats, addCustomer } = useApp();
+  const { colors } = useAppTheme();
   const [formVisible, setFormVisible] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -75,8 +76,8 @@ export default function CustomersScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.titleRow}>
           <View>
-            <Text style={styles.title}>Klientët</Text>
-            <Text style={styles.subtitle}>{customers.length} klientë gjithsej</Text>
+            <Text style={[styles.title, { color: colors.text }]}>Klientët</Text>
+            <Text style={[styles.subtitle, { color: colors.textMuted }]}>{customers.length} klientë gjithsej</Text>
           </View>
           <Pressable
             accessibilityRole="button"
@@ -85,7 +86,7 @@ export default function CustomersScreen() {
               resetForm();
               setFormVisible(true);
             }}
-            style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.addButton, { backgroundColor: '#F97316' }, pressed && styles.pressed]}
           >
             <Feather name="plus" size={18} color="#FFFFFF" />
             <Text style={styles.addButtonText}>Shto klient</Text>
@@ -113,7 +114,7 @@ export default function CustomersScreen() {
           })
         ) : (
           <View style={styles.empty}>
-            <Text style={styles.emptyText}>Ende nuk ka klientë.</Text>
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>Ende nuk ka klientë.</Text>
           </View>
         )}
       </ScrollView>
@@ -130,9 +131,9 @@ export default function CustomersScreen() {
           style={styles.modalBackdrop}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Klient i ri</Text>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Klient i ri</Text>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Mbyll formularin"
@@ -181,7 +182,7 @@ export default function CustomersScreen() {
                 onChangeText={setAddress}
                 editable={!saving}
               />
-              {formError ? <Text style={styles.formError}>{formError}</Text> : null}
+              {formError ? <Text style={[styles.formError, { color: colors.danger }]}>{formError}</Text> : null}
               <View style={styles.modalActions}>
                 <Button
                   label="Anulo"
@@ -215,10 +216,10 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 18,
   },
-  title: { color: colors.text, fontSize: 24, fontWeight: '800' },
-  subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 4 },
+  title: { fontSize: 24, fontWeight: '800' },
+  subtitle: { fontSize: 13, marginTop: 4 },
   empty: { alignItems: 'center', padding: 24 },
-  emptyText: { color: colors.textMuted, fontSize: 14 },
+  emptyText: { fontSize: 14 },
   addButton: {
     minHeight: 42,
     flexDirection: 'row',
@@ -227,7 +228,6 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     borderRadius: 12,
-    backgroundColor: colors.primary,
   },
   addButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
   pressed: { opacity: 0.8 },
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    backgroundColor: colors.background,
+    borderWidth: 1,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -250,8 +250,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 18,
   },
-  modalTitle: { color: colors.text, fontSize: 20, fontWeight: '800' },
-  formError: { color: colors.danger, fontSize: 13, marginBottom: 12 },
+  modalTitle: { fontSize: 20, fontWeight: '800' },
+  formError: { fontSize: 13, marginBottom: 12 },
   modalActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
   actionButton: { flex: 1 },
 });

@@ -1,4 +1,4 @@
-import { colors } from '@/constants/theme';
+import { useAppTheme } from '@/components/useAppTheme';
 import { FeatherName } from '@/types';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -16,6 +16,7 @@ const ICONS: Record<string, FeatherName> = {
 export function TabBar({ state, descriptors, emitter, navigateToTab }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { colors } = useAppTheme();
 
   const renderTab = (route: (typeof state.routes)[number]) => {
     const focused = state.routes[state.index]?.key === route.key;
@@ -62,13 +63,20 @@ export function TabBar({ state, descriptors, emitter, navigateToTab }: BottomTab
   const right = visibleRoutes.slice(2);
 
   return (
-    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+    <View style={[
+      styles.bar,
+      { paddingBottom: Math.max(insets.bottom, 10), backgroundColor: colors.surface, borderTopColor: colors.border },
+    ]}>
       {left.map(renderTab)}
 
       <View style={styles.fabSlot}>
         <Pressable
           onPress={() => router.push('/invoice')}
-          style={({ pressed }) => [styles.fab, pressed && { transform: [{ scale: 0.95 }] }]}
+          style={({ pressed }) => [
+            styles.fab,
+            { backgroundColor: '#F97316', borderColor: colors.surface },
+            pressed && { transform: [{ scale: 0.95 }] },
+          ]}
         >
           <Feather name="mic" size={26} color="#FFFFFF" />
         </Pressable>
@@ -83,9 +91,7 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
     paddingTop: 8,
   },
   tab: { flex: 1, alignItems: 'center', gap: 2 },
@@ -103,12 +109,10 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     marginTop: -30,
-    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 4,
-    borderColor: colors.surface,
-    shadowColor: colors.primary,
+    shadowColor: '#F97316',
     shadowOpacity: 0.4,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },

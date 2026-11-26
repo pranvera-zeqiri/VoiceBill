@@ -1,4 +1,5 @@
-import { colors, radius } from '@/constants/theme';
+import { radius } from '@/constants/theme';
+import { useAppTheme } from '@/components/useAppTheme';
 import { FeatherName } from '@/types';
 import { Feather } from '@expo/vector-icons';
 import { useState } from 'react';
@@ -14,9 +15,11 @@ interface Props extends TextInputProps {
 export function Input({ label, icon, error, dark, secureTextEntry, style, ...rest }: Props) {
   const [hidden, setHidden] = useState(!!secureTextEntry);
   const [focused, setFocused] = useState(false);
+  const { colors, darkMode } = useAppTheme();
 
-  const fg = dark ? colors.textOnDark : colors.text;
-  const muted = dark ? colors.textOnDarkMuted : colors.textMuted;
+  const useDarkField = dark || darkMode;
+  const fg = useDarkField ? colors.textOnDark : colors.text;
+  const muted = useDarkField ? colors.textOnDarkMuted : colors.textMuted;
 
   return (
     <View style={{ marginBottom: 14 }}>
@@ -25,12 +28,12 @@ export function Input({ label, icon, error, dark, secureTextEntry, style, ...res
         style={[
           styles.field,
           {
-            backgroundColor: dark ? colors.darkSurface : colors.surface,
+            backgroundColor: useDarkField ? colors.darkSurface : colors.surface,
             borderColor: error
               ? colors.danger
               : focused
               ? colors.primary
-              : dark
+              : useDarkField
               ? colors.darkBorder
               : colors.border,
           },
@@ -57,7 +60,7 @@ export function Input({ label, icon, error, dark, secureTextEntry, style, ...res
           </Pressable>
         ) : null}
       </View>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
     </View>
   );
 }
@@ -73,5 +76,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   input: { flex: 1, fontSize: 15, height: '100%' },
-  error: { color: colors.danger, fontSize: 12, marginTop: 4 },
+  error: { fontSize: 12, marginTop: 4 },
 });

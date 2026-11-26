@@ -39,11 +39,12 @@ async function requireAuthenticatedUser() {
 
 export const customerService = {
   async getCustomers(): Promise<Customer[]> {
-    await requireAuthenticatedUser();
+    const user = await requireAuthenticatedUser();
 
     const { data, error } = await supabase
       .from('customers')
       .select('id, name, phone, email, address, created_at')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (error) throw error;

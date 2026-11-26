@@ -1,2 +1,5 @@
 [functions.voice-invoice]
 verify_jwt = true
+
+[auth.email]
+enable_confirmations = false

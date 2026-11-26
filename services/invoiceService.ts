@@ -195,6 +195,7 @@ export const invoiceService = {
   },
 
   async getInvoiceDetails(invoiceId: string) {
+    const user = await requireAuthenticatedUser();
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoices')
       .select(`
@@ -203,6 +204,7 @@ export const invoiceService = {
         invoice_items (*)
       `)
       .eq('id', invoiceId)
+      .eq('user_id', user.id)
       .single();
 
     if (invoiceError) throw invoiceError;
@@ -338,10 +340,12 @@ export const invoiceService = {
   },
 
   async updateInvoiceStatus(invoiceId: string, status: 'draft' | 'pending' | 'paid' | 'overdue') {
+    const user = await requireAuthenticatedUser();
     const { data, error } = await supabase
       .from('invoices')
       .update({ status, updated_at: new Date().toISOString() })
       .eq('id', invoiceId)
+      .eq('user_id', user.id)
       .select()
       .single();
 
@@ -350,10 +354,12 @@ export const invoiceService = {
   },
 
   async deleteInvoice(invoiceId: string) {
+    const user = await requireAuthenticatedUser();
     const { error } = await supabase
       .from('invoices')
       .delete()
-      .eq('id', invoiceId);
+      .eq('id', invoiceId)
+      .eq('user_id', user.id);
 
     if (error) throw error;
     return true;

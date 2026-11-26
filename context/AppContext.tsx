@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { customerService } from '@/services/costumerService';
 import type { NewCustomerInput } from '@/services/costumerService';
 import { invoiceService } from '@/services/invoiceService';
@@ -50,12 +51,14 @@ interface AppContextValue {
   isAuthenticated: boolean;
   authReady: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (input: RegisterInput, password: string) => Promise<void>;
+  register: (input: RegisterInput, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   updateUser: (patch: Partial<User>) => Promise<void>;
 
   settings: Settings;
   updateSettings: (patch: Partial<Settings>) => void;
+  darkMode: boolean;
+  updateDarkMode: (enabled: boolean) => Promise<void>;
 
   customers: Customer[];
   invoices: Invoice[];
@@ -73,6 +76,27 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
+function mapAuthUser(authUser: {
+  email?: string;
+  user_metadata?: Record<string, unknown>;
+}): User {
+  const metadata = authUser.user_metadata ?? {};
+  const getText = (key: string, fallback = '') => {
+    const value = metadata[key];
+    return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+  };
+
+  return {
+    fullName: getText('full_name', 'Zejtar'),
+    businessName: getText('business_name', 'Servis'),
+    email: authUser.email ?? '',
+    phone: getText('phone'),
+    taxId: getText('tax_id'),
+    bankName: getText('bank_name'),
+    iban: getText('iban'),
+  };
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -87,6 +111,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     autoVat: true,
     vatRate: 18,
   });
+  const [darkMode, setDarkMode] = useState(true);
+  const themeUpdatedRef = useRef(false);
+
+  useEffect(() => {
+    void AsyncStorage.getItem('voicebill:dark-mode')
+      .then((stored) => {
+        if (!themeUpdatedRef.current && stored !== null) setDarkMode(stored === 'true');
+      })
+      .catch((error: unknown) => {
+        console.error('Nuk u lexua preferenca e temës:', error);
+      });
+  }, []);
 
   const refreshInvoices = useCallback(async () => {
     const request = ++invoiceRequest.current;
@@ -130,15 +166,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (!active) return;
       setAuthReady(true);
       if (session?.user) {
-        setUser({
-          fullName: session.user.user_metadata?.full_name || 'Zejtar',
-          businessName: session.user.user_metadata?.business_name || 'Servis',
-          email: session.user.email || '',
-          phone: session.user.user_metadata?.phone || '',
-          taxId: session.user.user_metadata?.tax_id || '',
-          bankName: session.user.user_metadata?.bank_name || '',
-          iban: session.user.user_metadata?.iban || '',
-        });
+        setUser(mapAuthUser(session.user));
         if (authChangeTimeout) clearTimeout(authChangeTimeout);
         authChangeTimeout = setTimeout(() => {
           if (!active) return;
@@ -184,25 +212,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [refreshInvoices]);
 
   const login = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     if (error) throw error;
+    setUser(mapAuthUser(data.user));
+    setAuthReady(true);
   }, []);
 
   const register = useCallback(async (input: RegisterInput, password: string) => {
     const { data, error } = await supabase.auth.signUp({
-      email: input.email,
+      email: input.email.trim(),
       password,
       options: {
         data: {
-          full_name: input.fullName,
-          business_name: input.businessName,
+          full_name: input.fullName.trim(),
+          business_name: input.businessName.trim(),
         },
       },
     });
     if (error) throw error;
+    if (!data.session) return false;
+    setUser(mapAuthUser(data.session.user));
+    setAuthReady(true);
+    return true;
   }, []);
 
   const logout = useCallback(async () => {
@@ -215,15 +249,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (sessionError) throw sessionError;
     if (!sessionData.user) throw new Error('Duhet të kyçeni për të ruajtur profilin.');
 
-    const current: User = {
-      fullName: sessionData.user.user_metadata?.full_name || 'Zejtar',
-      businessName: sessionData.user.user_metadata?.business_name || 'Servis',
-      email: sessionData.user.email || '',
-      phone: sessionData.user.user_metadata?.phone || '',
-      taxId: sessionData.user.user_metadata?.tax_id || '',
-      bankName: sessionData.user.user_metadata?.bank_name || '',
-      iban: sessionData.user.user_metadata?.iban || '',
-    };
+    const current = mapAuthUser(sessionData.user);
     const next = { ...current, ...patch };
     const { error } = await supabase.auth.updateUser({
       data: {
@@ -244,6 +270,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     (patch: Partial<Settings>) => setSettings((prev) => ({ ...prev, ...patch })),
     []
   );
+  const updateDarkMode = useCallback(async (enabled: boolean) => {
+    await AsyncStorage.setItem('voicebill:dark-mode', String(enabled));
+    themeUpdatedRef.current = true;
+    setDarkMode(enabled);
+  }, []);
 
   /* ----- Data ----- */
   const getCustomer = useCallback(
@@ -324,6 +355,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateUser,
       settings,
       updateSettings,
+      darkMode,
+      updateDarkMode,
       customers,
       invoices,
       invoicesLoading,
@@ -339,6 +372,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       user, authReady, login, register, logout, updateUser, settings, updateSettings,
+      darkMode, updateDarkMode,
       customers, invoices, invoicesLoading, invoicesError, refreshInvoices,
       getCustomer, getInvoice, getCustomerStats,
       addCustomer, addInvoice, updateInvoice, setInvoiceStatus,

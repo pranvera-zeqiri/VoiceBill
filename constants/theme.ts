@@ -23,6 +23,31 @@ export const colors = {
   neutralSoft: '#ECEAE6',
 } as const;
 
+export const darkColors = {
+  background: '#070A12',
+  surface: '#172036',
+  dark: '#070A12',
+  darkSurface: '#131B2E',
+  darkBorder: 'rgba(148,163,184,0.14)',
+  primary: '#F97316',
+  primaryDark: '#EA580C',
+  primarySoft: 'rgba(249,115,22,0.16)',
+  alertBg: '#172036',
+  text: '#F8FAFC',
+  textMuted: '#94A3B8',
+  textOnDark: '#F8FAFC',
+  textOnDarkMuted: '#94A3B8',
+  border: 'rgba(148,163,184,0.14)',
+  field: '#131B2E',
+  success: '#10B981',
+  successSoft: 'rgba(16,185,129,0.16)',
+  danger: '#F87171',
+  dangerSoft: 'rgba(248,113,113,0.15)',
+  neutralSoft: '#26334B',
+} as const;
+
+export const palettes = { light: colors, dark: darkColors } as const;
+
 export const radius = { sm: 10, md: 14, lg: 20, xl: 28, pill: 999 } as const;
 
 export const shadow = Platform.select({

@@ -50,16 +50,43 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      await register(
+      const sessionCreated = await register(
         { fullName: fullName.trim(), businessName: businessName.trim(), email: email.trim() },
         password
       );
+      if (!sessionCreated) {
+        Alert.alert(
+          'Konfirmo emailin',
+          `Kontrollo emailin ${email.trim()} dhe konfirmo llogarinë. Pastaj kyçu për të parë profilin dhe faturat.`,
+          [
+            {
+              text: 'Shko te hyrja',
+              onPress: () =>
+                router.replace({ pathname: '/auth/login', params: { email: email.trim() } }),
+            },
+          ]
+        );
+        return;
+      }
       router.replace('/tabs');
     } catch (error) {
-      Alert.alert(
-        'Regjistrimi dështoi',
-        error instanceof Error ? error.message : 'Kontrollo lidhjen dhe të dhënat e regjistrimit.'
-      );
+      const message = error instanceof Error ? error.message : 'Kontrollo lidhjen dhe të dhënat e regjistrimit.';
+      if (/user already registered|already registered/i.test(message)) {
+        Alert.alert(
+          'Llogaria ekziston',
+          'Kjo adresë emaili është regjistruar më parë. Kyçu me fjalëkalimin e asaj llogarie. Nëse llogaria u krijua para çaktivizimit të konfirmimit, ajo duhet aktivizuar veçmas në Supabase.',
+          [
+            { text: 'Mbyll', style: 'cancel' },
+            {
+              text: 'Shko te hyrja',
+              onPress: () =>
+                router.replace({ pathname: '/auth/login', params: { email: email.trim() } }),
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Regjistrimi dështoi', message);
+      }
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,5 @@
-import { colors, radius } from '@/constants/theme';
+import { radius } from '@/constants/theme';
+import { useAppTheme } from '@/components/useAppTheme';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
@@ -13,6 +14,8 @@ interface Props {
 
 export function Header({ title, right, dark, onBack }: Props) {
   const router = useRouter();
+  const { colors } = useAppTheme();
+  const useDarkHeader = dark || colors.background === '#070A12';
   const goBack = () => {
     if (onBack) return onBack();
     if (router.canGoBack()) {
@@ -30,15 +33,15 @@ export function Header({ title, right, dark, onBack }: Props) {
         style={[
           styles.back,
           {
-            backgroundColor: dark ? colors.darkSurface : colors.surface,
-            borderColor: dark ? colors.darkBorder : colors.border,
+            backgroundColor: useDarkHeader ? colors.darkSurface : colors.surface,
+            borderColor: useDarkHeader ? colors.darkBorder : colors.border,
           },
         ]}
       >
-        <Feather name="chevron-left" size={22} color={dark ? '#FFFFFF' : colors.text} />
+        <Feather name="chevron-left" size={22} color={useDarkHeader ? colors.textOnDark : colors.text} />
       </Pressable>
       <Text
-        style={[styles.title, { color: dark ? '#FFFFFF' : colors.text }]}
+        style={[styles.title, { color: useDarkHeader ? colors.textOnDark : colors.text }]}
         numberOfLines={1}
       >
         {title}

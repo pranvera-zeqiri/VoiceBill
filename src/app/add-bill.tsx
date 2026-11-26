@@ -1,5 +1,7 @@
 import { invoiceService, type ExtractedVoiceInvoice } from '@/services/invoiceService';
 import { useApp } from '@/context/AppContext';
+import { Screen } from '@/components/Screen';
+import { useAppTheme } from '@/components/useAppTheme';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -17,7 +19,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ORANGE = '#FB923C';
 const INK = '#1C1917';
@@ -56,6 +57,7 @@ export default function AddBillScreen() {
     transcript?: string | string[];
   }>();
   const { refreshInvoices } = useApp();
+  const { colors, darkMode } = useAppTheme();
   const audioUri = Array.isArray(params.audioUri) ? '' : params.audioUri ?? '';
   const transcript = Array.isArray(params.transcript) ? '' : params.transcript ?? '';
   const durationParam = Array.isArray(params.durationSeconds) ? '' : params.durationSeconds;
@@ -77,6 +79,14 @@ export default function AddBillScreen() {
       })) ?? []
   );
   const [saving, setSaving] = useState(false);
+
+  const goBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/invoice');
+    }
+  };
 
   const parsedItems = useMemo(
     () =>
@@ -189,42 +199,48 @@ export default function AddBillScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-      <StatusBar style="dark" />
+    <Screen style={styles.screen} edges={['top', 'bottom']}>
+      <StatusBar style={darkMode ? 'light' : 'dark'} />
       <View style={styles.header}>
-        <Pressable accessibilityLabel="Kthehu" onPress={() => router.back()} style={styles.backButton}>
-          <Feather name="arrow-left" size={20} color={INK} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Kthehu te regjistrimi"
+          hitSlop={8}
+          onPress={goBack}
+          style={[styles.backButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        >
+          <Feather name="chevron-left" size={22} color={colors.text} />
         </Pressable>
-        <View>
-          <Text style={styles.title}>Kontrollo faturën</Text>
-          <Text style={styles.subtitle}>AI e përgatiti nga regjistrimi yt</Text>
+        <View style={styles.headerText}>
+          <Text numberOfLines={1} style={[styles.title, { color: colors.text }]}>Kontrollo faturën</Text>
+          <Text numberOfLines={1} style={[styles.subtitle, { color: colors.textMuted }]}>AI e përgatiti nga regjistrimi yt</Text>
         </View>
       </View>
 
       <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <View style={styles.audioBanner}>
-            <View style={styles.audioIcon}><Feather name="mic" size={16} color={INK} /></View>
+          <View style={[styles.audioBanner, { backgroundColor: colors.primarySoft }]}>
+            <View style={styles.audioIcon}><Feather name="mic" size={16} color="#FFFFFF" /></View>
             <View>
-              <Text style={styles.audioTitle}>
+              <Text style={[styles.audioTitle, { color: colors.text }]}>
                 Nga regjistrimi juaj · {draft?.duration_formatted ?? formatDuration(durationSeconds)}
               </Text>
-              <Text style={styles.audioSub}>
+              <Text style={[styles.audioSub, { color: colors.textMuted }]}>
                 {analyzing ? 'AI po transkripton dhe përgatit faturën…' : 'Transkriptu u analizua automatikisht'}
               </Text>
             </View>
           </View>
 
           {!draft ? (
-            <View style={styles.errorCard}>
+            <View style={[styles.errorCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               {analyzing ? (
                 <View style={styles.analysisProgress}>
-                  <ActivityIndicator color={ORANGE} size="small" />
-                  <Text style={styles.errorText}>Po përgatiten transkripti dhe zërat e faturës…</Text>
+                  <ActivityIndicator color={colors.primary} size="small" />
+                  <Text style={[styles.errorText, { color: colors.text }]}>Po përgatiten transkripti dhe zërat e faturës…</Text>
                 </View>
               ) : (
                 <>
-                  <Text style={styles.errorText}>
+                  <Text style={[styles.errorText, { color: colors.text }]}>
                     {analysisError || 'Të dhënat e faturës mungojnë ose janë të pavlefshme.'}
                   </Text>
                   {analysisError && (audioUri || transcript) ? (
@@ -235,11 +251,11 @@ export default function AddBillScreen() {
                         setAnalysisAttempt((attempt) => attempt + 1);
                       }}
                     >
-                      <Text style={styles.backLink}>Provo përsëri</Text>
+                      <Text style={[styles.backLink, { color: colors.primary }]}>Provo përsëri</Text>
                     </Pressable>
                   ) : null}
-                  <Pressable onPress={() => router.back()}>
-                    <Text style={styles.backLink}>Kthehu te regjistrimi</Text>
+                  <Pressable onPress={goBack}>
+                    <Text style={[styles.backLink, { color: colors.primary }]}>Kthehu te regjistrimi</Text>
                   </Pressable>
                 </>
               )}
@@ -247,47 +263,47 @@ export default function AddBillScreen() {
           ) : (
             <>
               <View style={styles.metaRow}>
-                <View style={styles.metaBlock}>
-                  <Text style={styles.metaLabel}>PËR</Text>
-                  <TextInput value={clientName} onChangeText={setClientName} placeholder="Emri i klientit" placeholderTextColor="#A8A29E" style={styles.metaInput} />
+                <View style={[styles.metaBlock, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Text style={[styles.metaLabel, { color: colors.textMuted }]}>PËR</Text>
+                  <TextInput value={clientName} onChangeText={setClientName} placeholder="Emri i klientit" placeholderTextColor={colors.textMuted} style={[styles.metaInput, { color: colors.text }]} />
                 </View>
-                <View style={styles.metaBlock}>
-                  <Text style={styles.metaLabel}>DATA</Text>
-                  <Text style={styles.dateValue}>{dateLabel}</Text>
+                <View style={[styles.metaBlock, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Text style={[styles.metaLabel, { color: colors.textMuted }]}>DATA</Text>
+                  <Text style={[styles.dateValue, { color: colors.text }]}>{dateLabel}</Text>
                 </View>
               </View>
 
-              <Text style={styles.sectionLabel}>PËRSHKRIMI I PUNËS</Text>
-              <TextInput value={summary} onChangeText={setSummary} placeholder="Përmbledhja e shërbimit" placeholderTextColor="#A8A29E" style={styles.summaryInput} />
+              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>PËRSHKRIMI I PUNËS</Text>
+              <TextInput value={summary} onChangeText={setSummary} placeholder="Përmbledhja e shërbimit" placeholderTextColor={colors.textMuted} style={[styles.summaryInput, { backgroundColor: colors.field, color: colors.text }]} />
 
               <View style={styles.itemsHeading}>
-                <Text style={styles.sectionLabel}>ZËRAT E FATURËS</Text>
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ZËRAT E FATURËS</Text>
                 <Pressable
                   accessibilityLabel="Shto zë"
                   onPress={() => setItems((current) => [...current, { name: '', quantity: '1', unit: 'copë', unitPrice: '' }])}
-                  style={styles.addButton}
+                  style={[styles.addButton, { backgroundColor: colors.primarySoft }]}
                 >
-                  <Feather name="plus" size={17} color={ORANGE} />
+                  <Feather name="plus" size={17} color={colors.primary} />
                 </Pressable>
               </View>
               {items.map((item, index) => {
                 const lineTotal = numberValue(item.quantity) * numberValue(item.unitPrice);
                 return (
                   <AnimatedItem key={`item-${index}`} index={index}>
-                    <View style={styles.itemCard}>
+                    <View style={[styles.itemCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                       <View style={styles.itemTop}>
-                        <TextInput value={item.name} onChangeText={(value) => updateItem(index, { name: value })} placeholder="Përshkrimi" placeholderTextColor="#A8A29E" style={styles.itemName} />
+                        <TextInput value={item.name} onChangeText={(value) => updateItem(index, { name: value })} placeholder="Përshkrimi" placeholderTextColor={colors.textMuted} style={[styles.itemName, { color: colors.text }]} />
                         {items.length > 1 ? (
                           <Pressable accessibilityLabel="Hiq zërin" onPress={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))}>
-                            <Feather name="trash-2" size={16} color="#A8A29E" />
+                            <Feather name="trash-2" size={16} color={colors.textMuted} />
                           </Pressable>
                         ) : null}
                       </View>
                       <View style={styles.itemFields}>
-                        <TextInput keyboardType="decimal-pad" value={item.quantity} onChangeText={(value) => updateItem(index, { quantity: value })} style={styles.itemField} placeholder="Sasia" placeholderTextColor="#A8A29E" />
-                        <TextInput value={item.unit} onChangeText={(value) => updateItem(index, { unit: value })} style={styles.itemField} placeholder="Njësia" placeholderTextColor="#A8A29E" />
-                        <TextInput keyboardType="decimal-pad" value={item.unitPrice} onChangeText={(value) => updateItem(index, { unitPrice: value })} style={styles.itemField} placeholder="Çmimi €" placeholderTextColor="#A8A29E" />
-                        <Text style={styles.lineTotal}>{money(lineTotal)}</Text>
+                        <TextInput keyboardType="decimal-pad" value={item.quantity} onChangeText={(value) => updateItem(index, { quantity: value })} style={[styles.itemField, { backgroundColor: colors.field, color: colors.text }]} placeholder="Sasia" placeholderTextColor={colors.textMuted} />
+                        <TextInput value={item.unit} onChangeText={(value) => updateItem(index, { unit: value })} style={[styles.itemField, { backgroundColor: colors.field, color: colors.text }]} placeholder="Njësia" placeholderTextColor={colors.textMuted} />
+                        <TextInput keyboardType="decimal-pad" value={item.unitPrice} onChangeText={(value) => updateItem(index, { unitPrice: value })} style={[styles.itemField, { backgroundColor: colors.field, color: colors.text }]} placeholder="Çmimi €" placeholderTextColor={colors.textMuted} />
+                        <Text style={[styles.lineTotal, { color: colors.text }]}>{money(lineTotal)}</Text>
                       </View>
                     </View>
                   </AnimatedItem>
@@ -295,25 +311,25 @@ export default function AddBillScreen() {
               })}
 
               <AnimatedItem index={items.length}>
-                <View style={styles.totalsCard}>
+                <View style={[styles.totalsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <SummaryRow label="Nëntotali" value={money(subtotal)} />
                   <View style={styles.vatRow}>
-                    <Text style={styles.rowLabel}>TVA</Text>
-                    <View style={styles.vatInputWrap}>
-                      <TextInput keyboardType="decimal-pad" value={vatRate} onChangeText={setVatRate} style={styles.vatInput} />
-                      <Text style={styles.vatSuffix}>%</Text>
+                    <Text style={[styles.rowLabel, { color: colors.textMuted }]}>TVA</Text>
+                    <View style={[styles.vatInputWrap, { backgroundColor: colors.field }]}>
+                      <TextInput keyboardType="decimal-pad" value={vatRate} onChangeText={setVatRate} style={[styles.vatInput, { color: colors.text }]} />
+                      <Text style={[styles.vatSuffix, { color: colors.textMuted }]}>%</Text>
                     </View>
-                    <Text style={styles.rowValue}>{money(vatAmount)}</Text>
+                    <Text style={[styles.rowValue, { color: colors.text, fontVariant: ['tabular-nums'] }]}>{money(vatAmount)}</Text>
                   </View>
-                  <View style={styles.divider} />
+                  <View style={[styles.divider, { backgroundColor: colors.border }]} />
                   <SummaryRow label="Totali" value={money(total)} strong />
                 </View>
               </AnimatedItem>
 
               {draft.transcript ? (
-                <View style={styles.transcriptBox}>
-                  <Text style={styles.sectionLabel}>TRANSKRIPTI</Text>
-                  <Text style={styles.transcriptText}>{draft.transcript}</Text>
+                <View style={[styles.transcriptBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>TRANSKRIPTI</Text>
+                    <Text style={[styles.transcriptText, { color: colors.textMuted }]}>{draft.transcript}</Text>
                 </View>
               ) : null}
             </>
@@ -322,14 +338,14 @@ export default function AddBillScreen() {
       </KeyboardAvoidingView>
 
       {draft ? (
-        <View style={styles.footer}>
+        <View style={[styles.footer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
           <Pressable disabled={saving} onPress={() => void save()} style={[styles.saveButton, saving && styles.saving]}>
             {saving ? <ActivityIndicator color={INK} /> : <Text style={styles.saveLabel}>Dërgo faturën</Text>}
             {!saving ? <Feather name="arrow-right" size={18} color={INK} /> : null}
           </Pressable>
         </View>
       ) : null}
-    </SafeAreaView>
+    </Screen>
   );
 }
 
@@ -364,10 +380,11 @@ function AnimatedItem({ children, index }: PropsWithChildren<{ index: number }>)
 }
 
 function SummaryRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+  const { colors } = useAppTheme();
   return (
     <View style={styles.summaryRow}>
-      <Text style={[styles.rowLabel, strong && styles.strong]}>{label}</Text>
-      <Text style={[styles.rowValue, strong && styles.strong]}>{value}</Text>
+      <Text style={[styles.rowLabel, { color: strong ? colors.text : colors.textMuted }, strong && styles.strong]}>{label}</Text>
+      <Text style={[styles.rowValue, { color: colors.text, fontVariant: ['tabular-nums'] }, strong && styles.strong]}>{value}</Text>
     </View>
   );
 }
@@ -377,13 +394,14 @@ function formatDuration(seconds: number) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#FAF5EE' },
+  screen: { backgroundColor: 'transparent' },
   fill: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 15 },
-  backButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 24, paddingTop: 8, paddingBottom: 15 },
+  headerText: { flex: 1, minWidth: 0 },
+  backButton: { width: 42, height: 42, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   title: { color: INK, fontSize: 20, fontWeight: '800' },
   subtitle: { color: '#78716C', fontSize: 12, marginTop: 3 },
-  content: { paddingHorizontal: 20, paddingBottom: 20 },
+  content: { paddingHorizontal: 24, paddingBottom: 24 },
   audioBanner: { flexDirection: 'row', alignItems: 'center', gap: 11, padding: 14, backgroundColor: '#FFEDD5', borderRadius: 16, marginBottom: 18 },
   audioIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center' },
   audioTitle: { color: INK, fontSize: 13, fontWeight: '800' },
@@ -393,7 +411,7 @@ const styles = StyleSheet.create({
   errorText: { color: INK, fontSize: 14 },
   backLink: { color: '#C2410C', fontWeight: '700', marginTop: 14 },
   metaRow: { flexDirection: 'row', gap: 12, marginBottom: 18 },
-  metaBlock: { flex: 1, padding: 14, backgroundColor: '#FFFFFF', borderRadius: 16 },
+  metaBlock: { flex: 1, padding: 14, borderRadius: 16, borderWidth: 1 },
   metaLabel: { color: '#A8A29E', fontSize: 10, fontWeight: '800', letterSpacing: 1, marginBottom: 8 },
   metaInput: { color: INK, fontSize: 15, fontWeight: '700', padding: 0 },
   dateValue: { color: INK, fontSize: 13, fontWeight: '700' },
@@ -415,11 +433,11 @@ const styles = StyleSheet.create({
   vatSuffix: { color: '#78716C', fontSize: 12 },
   rowLabel: { color: '#78716C', fontSize: 13 },
   rowValue: { color: INK, fontSize: 13, fontWeight: '700' },
-  divider: { height: 1, backgroundColor: '#E7E5E4' },
+  divider: { height: 1 },
   strong: { color: INK, fontSize: 16, fontWeight: '800' },
   transcriptBox: { marginTop: 14, padding: 14, borderRadius: 14, backgroundColor: '#FFFFFF' },
   transcriptText: { color: '#57534E', lineHeight: 20, fontSize: 12, marginTop: 8 },
-  footer: { padding: 16, borderTopWidth: 1, borderTopColor: '#E7E5E4', backgroundColor: '#FAF5EE' },
+  footer: { padding: 20, borderTopWidth: 1, borderTopColor: '#E7E5E4', backgroundColor: '#FAF5EE' },
   saveButton: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 16, backgroundColor: ORANGE },
   saving: { opacity: 0.75 },
   saveLabel: { color: INK, fontSize: 15, fontWeight: '800' },

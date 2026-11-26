@@ -5,6 +5,7 @@ import { colors, radius } from '@/constants/theme';
 import { useApp } from '@/context/AppContext';
 import { calcTotals, formatDate, formatMoney, formatSavedDate, formatTime } from '@/utils/format';
 import { invoiceService } from '@/services/invoiceService';
+import { useAppTheme } from '@/components/useAppTheme';
 import { generateAndShareInvoicePdf, shareInvoice } from '@/utils/share';
 import { Feather } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
@@ -16,6 +17,7 @@ export default function InvoiceDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { getCustomer, getInvoice, user, refreshInvoices, updateInvoice } = useApp();
+  const { colors } = useAppTheme();
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const invoice = getInvoice(id);
 
@@ -24,7 +26,7 @@ export default function InvoiceDetailsScreen() {
       <Screen>
         <Header title="Fatura" onBack={() => router.back()} />
         <View style={styles.empty}>
-          <Text style={styles.emptyText}>Fatura nuk u gjet.</Text>
+          <Text style={[styles.emptyText, { color: colors.textMuted }]}>Fatura nuk u gjet.</Text>
         </View>
       </Screen>
     );
@@ -100,69 +102,69 @@ export default function InvoiceDetailsScreen() {
           <Pressable
             accessibilityLabel="Ndaj faturën"
             onPress={() => void share()}
-            style={styles.shareButton}
+            style={[styles.shareButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
           >
             <Feather name="share-2" size={18} color={colors.text} />
           </Pressable>
         }
       />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.summary}>
+        <View style={[styles.summary, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.summaryTop}>
-            <Text style={styles.title}>{invoice.title}</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{invoice.title}</Text>
             <StatusBadge status={invoice.status} />
           </View>
-          <Text style={styles.customer}>{customer?.name ?? 'Klient'}</Text>
-          <Text style={styles.date}>
+          <Text style={[styles.customer, { color: colors.text }]}>{customer?.name ?? 'Klient'}</Text>
+          <Text style={[styles.date, { color: colors.textMuted }]}>
             Data: {invoice.createdAt ? formatSavedDate(invoice.createdAt) : formatDate(invoice.date)}
           </Text>
-          <Text style={styles.date}>
+          <Text style={[styles.date, { color: colors.textMuted }]}>
             Ora: {invoice.createdAt ? formatTime(invoice.createdAt) : '--:--'}
           </Text>
-          <Text style={styles.date}>Afati i pagesës: {formatDate(invoice.dueDate)}</Text>
+          <Text style={[styles.date, { color: colors.textMuted }]}>Afati i pagesës: {formatDate(invoice.dueDate)}</Text>
         </View>
 
         {iban ? (
-          <View style={styles.paymentCard}>
-            <Text style={styles.sectionTitle}>Pagesa bankare</Text>
-            {user?.bankName ? <Text style={styles.paymentText}>Banka: {user.bankName}</Text> : null}
-            <Text style={styles.paymentText}>IBAN: {iban}</Text>
+          <View style={[styles.paymentCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Pagesa bankare</Text>
+            {user?.bankName ? <Text style={[styles.paymentText, { color: colors.text }]}>Banka: {user.bankName}</Text> : null}
+            <Text style={[styles.paymentText, { color: colors.text }]}>IBAN: {iban}</Text>
           </View>
         ) : null}
 
-        <View style={styles.qrCard}>
+        <View style={[styles.qrCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <QRCode value={qrValue} size={156} />
-          <Text style={styles.qrTitle}>Detajet e pagesës</Text>
-          <Text style={styles.qrCaption}>
+          <Text style={[styles.qrTitle, { color: colors.text }]}>Detajet e pagesës</Text>
+          <Text style={[styles.qrCaption, { color: colors.textMuted }]}>
             Fatura #{invoice.number} · {formatMoney(totals.total)}
           </Text>
-          {iban ? <Text style={styles.qrCaption}>IBAN: {iban}</Text> : null}
+          {iban ? <Text style={[styles.qrCaption, { color: colors.textMuted }]}>IBAN: {iban}</Text> : null}
         </View>
 
-        <Text style={styles.sectionTitle}>Artikujt</Text>
-        <View style={styles.items}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Artikujt</Text>
+        <View style={[styles.items, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {invoice.items.map((item) => (
-            <View key={item.id} style={styles.item}>
+            <View key={item.id} style={[styles.item, { borderBottomColor: colors.border }]}>
               <View style={styles.itemDescription}>
-                <Text style={styles.itemTitle}>{item.title}</Text>
-                <Text style={styles.muted}>
+                <Text style={[styles.itemTitle, { color: colors.text }]}>{item.title}</Text>
+                <Text style={[styles.muted, { color: colors.textMuted }]}>
                   {item.quantity} {item.unit} × {formatMoney(item.unitPrice)}
                 </Text>
               </View>
-              <Text style={styles.itemTotal}>
+              <Text style={[styles.itemTotal, { color: colors.text, fontVariant: ['tabular-nums'] }]}>
                 {formatMoney(item.quantity * item.unitPrice)}
               </Text>
             </View>
           ))}
         </View>
 
-        <View style={styles.totals}>
+        <View style={[styles.totals, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <TotalRow label="Nëntotali" value={formatMoney(totals.subtotal)} />
           <TotalRow label={`TVSH (${invoice.vatRate}%)`} value={formatMoney(totals.vat)} />
-          <View style={styles.totalDivider} />
+          <View style={[styles.totalDivider, { backgroundColor: colors.border }]} />
           <TotalRow label="Gjithsej" value={formatMoney(totals.total)} strong />
         </View>
-        <Pressable accessibilityLabel="Ruaj PDF ose dërgo" onPress={() => void exportPdf()} style={styles.pdfButton}>
+        <Pressable accessibilityLabel="Ruaj PDF ose dërgo" onPress={() => void exportPdf()} style={[styles.pdfButton, { backgroundColor: colors.primary }]}>
           <Feather name="file-text" size={18} color="#FFFFFF" />
           <Text style={styles.pdfButtonText}>Ruaj PDF / Dërgo</Text>
           <Feather name="send" size={17} color="#FFFFFF" />
@@ -190,10 +192,11 @@ export default function InvoiceDetailsScreen() {
 }
 
 function TotalRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+  const { colors } = useAppTheme();
   return (
     <View style={styles.totalRow}>
-      <Text style={[styles.totalLabel, strong && styles.strong]}>{label}</Text>
-      <Text style={[styles.totalValue, strong && styles.strong]}>{value}</Text>
+      <Text style={[styles.totalLabel, { color: strong ? colors.text : colors.textMuted }, strong && styles.strong]}>{label}</Text>
+      <Text style={[styles.totalValue, { color: colors.text, fontVariant: ['tabular-nums'] }, strong && styles.strong]}>{value}</Text>
     </View>
   );
 }
@@ -247,7 +250,7 @@ const styles = StyleSheet.create({
   totalLabel: { color: colors.textMuted, fontSize: 13 },
   totalValue: { color: colors.text, fontSize: 13, fontWeight: '600' },
   totalDivider: { height: 1, backgroundColor: colors.border, marginVertical: 2 },
-  strong: { color: colors.text, fontSize: 15, fontWeight: '800' },
+  strong: { fontSize: 15, fontWeight: '800' },
   pdfButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -256,14 +259,13 @@ const styles = StyleSheet.create({
     minHeight: 54,
     marginTop: 18,
     borderRadius: radius.md,
-    backgroundColor: colors.primary,
   },
   pdfButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
-  paymentCard: { padding: 16, marginTop: 16, borderRadius: radius.md, backgroundColor: colors.surface },
-  paymentText: { color: colors.text, fontSize: 13, marginTop: 8, fontWeight: '600' },
-  qrCard: { alignItems: 'center', gap: 8, padding: 18, marginTop: 16, borderRadius: radius.md, backgroundColor: colors.surface },
-  qrTitle: { color: colors.text, fontSize: 15, fontWeight: '800', marginTop: 6 },
-  qrCaption: { color: colors.textMuted, fontSize: 12, textAlign: 'center' },
+  paymentCard: { padding: 16, marginTop: 16, borderRadius: radius.md, borderWidth: 1 },
+  paymentText: { fontSize: 13, marginTop: 8, fontWeight: '600' },
+  qrCard: { alignItems: 'center', gap: 8, padding: 18, marginTop: 16, borderRadius: radius.md, borderWidth: 1 },
+  qrTitle: { fontSize: 15, fontWeight: '800', marginTop: 6 },
+  qrCaption: { fontSize: 12, textAlign: 'center' },
   statusButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -272,10 +274,10 @@ const styles = StyleSheet.create({
     minHeight: 52,
     marginTop: 12,
     borderRadius: radius.md,
-    backgroundColor: colors.primary,
+    backgroundColor: '#10B981',
   },
   statusButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
   disabledButton: { opacity: 0.6 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  emptyText: { color: colors.textMuted, fontSize: 14 },
+  emptyText: { fontSize: 14 },
 });

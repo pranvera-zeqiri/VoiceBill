@@ -2,8 +2,9 @@ import { Button } from '@/components/button';
 import { Header } from '@/components/Header';
 import { Input } from '@/components/Input';
 import { Screen } from '@/components/Screen';
-import { colors, radius } from '@/constants/theme';
+import { radius } from '@/constants/theme';
 import { useApp } from '@/context/AppContext';
+import { useAppTheme } from '@/components/useAppTheme';
 import { uid } from '@/utils/format';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -13,6 +14,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 export default function CreateInvoiceScreen() {
   const router = useRouter();
   const { customers, settings, addInvoice } = useApp();
+  const { colors } = useAppTheme();
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? '');
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
@@ -57,7 +59,7 @@ export default function CreateInvoiceScreen() {
     <Screen>
       <Header title="Faturë e re" onBack={() => router.back()} />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.label}>Zgjidh klientin</Text>
+        <Text style={[styles.label, { color: colors.textMuted }]}>Zgjidh klientin</Text>
         {customers.length > 0 ? (
           <View style={styles.customers}>
             {customers.map((customer) => {
@@ -71,9 +73,13 @@ export default function CreateInvoiceScreen() {
                     setCustomerId(customer.id);
                     setError('');
                   }}
-                  style={[styles.customer, selected && styles.selectedCustomer]}
+                  style={[
+                    styles.customer,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    selected && { backgroundColor: colors.primary, borderColor: colors.primary },
+                  ]}
                 >
-                  <Text style={[styles.customerName, selected && styles.selectedText]}>
+                  <Text style={[styles.customerName, { color: selected ? '#FFFFFF' : colors.text }]}>
                     {customer.name}
                   </Text>
                   {selected ? <Feather name="check" size={16} color="#FFFFFF" /> : null}
@@ -82,7 +88,7 @@ export default function CreateInvoiceScreen() {
             })}
           </View>
         ) : (
-          <Text style={styles.helper}>Shto një klient para se të krijosh faturën.</Text>
+          <Text style={[styles.helper, { color: colors.textMuted }]}>Shto një klient para se të krijosh faturën.</Text>
         )}
 
         <Input
@@ -107,9 +113,9 @@ export default function CreateInvoiceScreen() {
           keyboardType="decimal-pad"
         />
         {settings.autoVat ? (
-          <Text style={styles.helper}>Do të aplikohet TVSH {settings.vatRate}%.</Text>
+          <Text style={[styles.helper, { color: colors.textMuted }]}>Do të aplikohet TVSH {settings.vatRate}%.</Text>
         ) : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
         <Button
           label="Krijo faturën"
           icon="plus"
@@ -125,7 +131,7 @@ export default function CreateInvoiceScreen() {
 
 const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 32 },
-  label: { color: colors.textMuted, fontSize: 12, fontWeight: '600', marginBottom: 8 },
+  label: { fontSize: 12, fontWeight: '600', marginBottom: 8 },
   customers: { gap: 8, marginBottom: 20 },
   customer: {
     minHeight: 46,
@@ -135,13 +141,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
   },
-  selectedCustomer: { backgroundColor: colors.primary, borderColor: colors.primary },
-  customerName: { color: colors.text, fontSize: 14, fontWeight: '600' },
-  selectedText: { color: '#FFFFFF' },
-  helper: { color: colors.textMuted, fontSize: 12, marginBottom: 14 },
-  error: { color: colors.danger, fontSize: 13, marginBottom: 12 },
+  customerName: { fontSize: 14, fontWeight: '600' },
+  helper: { fontSize: 12, marginBottom: 14 },
+  error: { fontSize: 13, marginBottom: 12 },
   submit: { marginTop: 8 },
 });

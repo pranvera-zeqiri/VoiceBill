@@ -1,4 +1,4 @@
-import { colors } from '@/constants/theme';
+import { useAppTheme } from '@/components/useAppTheme';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 interface Props {
@@ -8,12 +8,13 @@ interface Props {
 }
 
 export function SectionHeader({ title, actionLabel, onAction }: Props) {
+  const { colors } = useAppTheme();
   return (
     <View style={styles.row}>
-      <Text style={styles.title}>{title}</Text>
+      <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
       {actionLabel ? (
         <Pressable onPress={onAction} hitSlop={8}>
-          <Text style={styles.action}>{actionLabel}</Text>
+          <Text style={[styles.action, { color: colors.primary }]}>{actionLabel}</Text>
         </Pressable>
       ) : null}
     </View>
@@ -28,6 +29,6 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 12,
   },
-  title: { fontSize: 16, fontWeight: '800', color: colors.text },
-  action: { fontSize: 13, fontWeight: '700', color: colors.primary },
+  title: { fontSize: 16, fontWeight: '800' },
+  action: { fontSize: 13, fontWeight: '700' },
 });

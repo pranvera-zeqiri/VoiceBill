@@ -1,4 +1,4 @@
-import { colors } from '@/constants/theme';
+import { useAppTheme } from '@/components/useAppTheme';
 import { StyleSheet, View } from 'react-native';
 
 interface Props {
@@ -8,6 +8,7 @@ interface Props {
 
 /** Last bar is highlighted in orange (today). */
 export function MiniBarChart({ values, height = 56 }: Props) {
+  const { colors, darkMode } = useAppTheme();
   const max = Math.max(...values, 1);
   return (
     <View style={[styles.row, { height }]}>
@@ -20,7 +21,7 @@ export function MiniBarChart({ values, height = 56 }: Props) {
               styles.bar,
               {
                 height: Math.max(10, (v / max) * height),
-                backgroundColor: isLast ? colors.primary : '#2B4350',
+                backgroundColor: isLast ? colors.primary : darkMode ? '#2B3D5A' : '#2B4350',
               },
             ]}
           />

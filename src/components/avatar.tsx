@@ -1,4 +1,4 @@
-import { colors } from '@/constants/theme';
+import { useAppTheme } from '@/components/useAppTheme';
 import { getInitials } from '@/utils/format';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -9,6 +9,7 @@ interface Props {
 }
 
 export function Avatar({ name, size = 40, variant = 'light' }: Props) {
+  const { colors, darkMode } = useAppTheme();
   const dark = variant === 'dark';
   return (
     <View
@@ -18,7 +19,9 @@ export function Avatar({ name, size = 40, variant = 'light' }: Props) {
           width: size,
           height: size,
           borderRadius: size / 2,
-          backgroundColor: dark ? colors.dark : colors.neutralSoft,
+          backgroundColor: dark
+            ? darkMode ? '#26334B' : colors.dark
+            : darkMode ? '#22304A' : colors.neutralSoft,
         },
       ]}
     >
@@ -26,7 +29,7 @@ export function Avatar({ name, size = 40, variant = 'light' }: Props) {
         style={{
           fontSize: size * 0.34,
           fontWeight: '800',
-          color: dark ? '#FFFFFF' : colors.text,
+          color: dark ? colors.textOnDark : colors.text,
         }}
       >
         {getInitials(name)}

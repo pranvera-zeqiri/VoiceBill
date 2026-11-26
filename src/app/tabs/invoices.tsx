@@ -1,6 +1,7 @@
 import { Screen } from '@/components/Screen';
 import { useApp } from '@/context/AppContext';
 import { invoiceService } from '@/services/invoiceService';
+import { useAppTheme } from '@/components/useAppTheme';
 import type { Invoice, InvoiceStatus } from '@/types';
 import { daysSince, getInitials, statusLabel } from '@/utils/format';
 import { Feather } from '@expo/vector-icons';
@@ -35,6 +36,8 @@ function displayStatus(invoice: Invoice): InvoiceStatus {
 export default function InvoicesScreen() {
   const router = useRouter();
   const { invoices, getCustomer, invoicesLoading, invoicesError, refreshInvoices, user } = useApp();
+  const { colors } = useAppTheme();
+  const ink = colors.text;
   const [filter, setFilter] = useState<Filter>('all');
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState('');
@@ -111,7 +114,7 @@ export default function InvoicesScreen() {
     <Screen style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <Text style={styles.title}>Faturat</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Faturat</Text>
           <Pressable
             accessibilityLabel={searching ? 'Mbyll kërkimin' : 'Kërko faturë'}
             style={styles.searchToggle}
@@ -120,76 +123,76 @@ export default function InvoicesScreen() {
               setQuery('');
             }}
           >
-            <Feather name={searching ? 'x' : 'search'} size={19} color={INK} />
+            <Feather name={searching ? 'x' : 'search'} size={19} color={ink} />
           </Pressable>
         </View>
 
         {searching ? (
-          <View style={styles.searchBox}>
-            <Feather name="search" size={17} color="#78716C" />
+          <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Feather name="search" size={17} color={colors.textMuted} />
             <TextInput
               autoFocus
               value={query}
               onChangeText={setQuery}
               placeholder="Kërko klient ose numër fature..."
-              placeholderTextColor="#A8A29E"
-              style={styles.searchInput}
+              placeholderTextColor={colors.textMuted}
+              style={[styles.searchInput, { color: colors.text }]}
             />
           </View>
         ) : null}
 
         <View style={styles.filters}>
-          <FilterPill label="Të gjitha" selected={filter === 'all'} onPress={() => setFilter('all')} />
-          <FilterPill label={`Në pritje ${openCount}`} selected={filter === 'open'} onPress={() => setFilter('open')} />
-          <FilterPill label={`Paguar ${paidCount}`} selected={filter === 'paid'} onPress={() => setFilter('paid')} />
+          <FilterPill label="Të gjitha" selected={filter === 'all'} onPress={() => setFilter('all')} palette={colors} />
+          <FilterPill label={`Në pritje ${openCount}`} selected={filter === 'open'} onPress={() => setFilter('open')} palette={colors} />
+          <FilterPill label={`Paguar ${paidCount}`} selected={filter === 'paid'} onPress={() => setFilter('paid')} palette={colors} />
         </View>
 
         {overdueInvoice && filter !== 'paid' ? (
-          <View style={styles.reminder}>
-            <View style={styles.reminderIcon}><Feather name="zap" size={17} color={INK} /></View>
+          <View style={[styles.reminder, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.reminderIcon, { backgroundColor: '#F59E0B' }]}><Feather name="zap" size={17} color={ink} /></View>
             <View style={styles.reminderCopy}>
-              <Text style={styles.reminderTitle}>{overdueName} ka faturë të vonuar</Text>
-              <Text style={styles.reminderSub}>Dërgo një kujtesë për pagesën</Text>
+              <Text style={[styles.reminderTitle, { color: colors.text }]}>{overdueName} ka faturë të vonuar</Text>
+              <Text style={[styles.reminderSub, { color: colors.textMuted }]}>Dërgo një kujtesë për pagesën</Text>
             </View>
-            <Pressable onPress={() => void sendReminder()} style={styles.reminderButton}>
+            <Pressable onPress={() => void sendReminder()} style={[styles.reminderButton, { backgroundColor: colors.primary }]}>
               <Text style={styles.reminderButtonLabel}>Dërgo</Text>
             </Pressable>
           </View>
         ) : null}
 
         {invoicesError ? (
-          <Pressable onPress={() => void refreshInvoices()} style={styles.notice}>
-            <Text style={styles.noticeText}>Faturat nuk mund të ngarkoheshin nga Supabase. Prek për të provuar përsëri.</Text>
+          <Pressable onPress={() => void refreshInvoices()} style={[styles.notice, { backgroundColor: colors.dangerSoft }]}>
+            <Text style={[styles.noticeText, { color: colors.danger }]}>Faturat nuk mund të ngarkoheshin nga Supabase. Prek për të provuar përsëri.</Text>
           </Pressable>
         ) : invoicesLoading && invoices.length === 0 ? (
-          <Text style={styles.empty}>Po ngarkohen faturat...</Text>
+          <Text style={[styles.empty, { color: colors.textMuted }]}>Po ngarkohen faturat...</Text>
         ) : groups.length === 0 ? (
-          <Text style={styles.empty}>Nuk u gjet asnjë faturë.</Text>
+          <Text style={[styles.empty, { color: colors.textMuted }]}>Nuk u gjet asnjë faturë.</Text>
         ) : (
           groups.map((group) => (
             <View key={group.title}>
-              <Text style={styles.groupTitle}>{group.title}</Text>
+              <Text style={[styles.groupTitle, { color: colors.textMuted }]}>{group.title}</Text>
               {group.invoices.map((invoice) => {
                 const clientName = invoice.customerName ?? getCustomer(invoice.customerId)?.name ?? 'Klient';
                 const status = displayStatus(invoice);
                 return (
-                  <View key={invoice.id} style={styles.invoiceCard}>
+                  <View key={invoice.id} style={[styles.invoiceCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                     <Pressable
                       onPress={() => router.push(`/invoice/${invoice.id}`)}
                       style={styles.invoiceMain}
                     >
-                      <View style={styles.avatar}>
-                        <Text style={styles.avatarText}>{getInitials(clientName) || 'K'}</Text>
+                      <View style={[styles.avatar, { backgroundColor: colors.primarySoft }]}>
+                        <Text style={[styles.avatarText, { color: colors.primary }]}>{getInitials(clientName) || 'K'}</Text>
                       </View>
                       <View style={styles.invoiceCopy}>
-                        <Text numberOfLines={1} style={styles.clientName}>{clientName}</Text>
-                        <Text numberOfLines={1} style={styles.serviceName}>{invoice.title}</Text>
-                        <Text style={styles.invoiceNumber}>#{invoice.number}</Text>
+                        <Text numberOfLines={1} style={[styles.clientName, { color: colors.text }]}>{clientName}</Text>
+                        <Text numberOfLines={1} style={[styles.serviceName, { color: colors.textMuted }]}>{invoice.title}</Text>
+                        <Text style={[styles.invoiceNumber, { color: colors.textMuted }]}>#{invoice.number}</Text>
                       </View>
-                      <Text style={styles.amount}>{formatMoney(getInvoiceTotal(invoice))}</Text>
+                      <Text style={[styles.amount, { color: colors.text, fontVariant: ['tabular-nums'] }]}>{formatMoney(getInvoiceTotal(invoice))}</Text>
                     </Pressable>
-                    <View style={styles.cardFooter}>
-                      <Text style={styles.issuedDate}>{new Date(`${invoice.date}T12:00:00`).toLocaleDateString('sq-AL')}</Text>
+                    <View style={[styles.cardFooter, { borderTopColor: colors.border }]}>
+                      <Text style={[styles.issuedDate, { color: colors.textMuted }]}>{new Date(`${invoice.date}T12:00:00`).toLocaleDateString('sq-AL')}</Text>
                       <View style={styles.cardActions}>
                         <Pressable
                           accessibilityLabel={`Shpërndaj PDF-në e faturës ${invoice.number}`}
@@ -201,19 +204,19 @@ export default function InvoicesScreen() {
                           ).catch((error) => {
                             Alert.alert('PDF-ja nuk u krijua', error instanceof Error ? error.message : 'Provo përsëri.');
                           })}
-                          style={styles.cardShare}
+                          style={[styles.cardShare, { backgroundColor: colors.primarySoft }]}
                         >
-                          <Feather name="share-2" size={13} color={INK} />
+                          <Feather name="share-2" size={13} color={colors.primary} />
                         </Pressable>
                         <Pressable
                           disabled={invoice.status === 'paid' || updatingId === invoice.id}
                           onPress={() => void markPaid(invoice)}
-                          style={[styles.statusPill, statusStyles[status]]}
+                          style={[styles.statusPill, { backgroundColor: statusColor(status, colors).backgroundColor }]}
                         >
-                          <Text style={[styles.statusText, status === 'paid' && styles.paidText]}>
+                          <Text style={[styles.statusText, { color: statusColor(status, colors).color }]}>
                             {updatingId === invoice.id ? 'Po ruhet...' : statusLabel[status]}
                           </Text>
-                          {invoice.status !== 'paid' ? <Feather name="check" size={12} color="#9A3412" /> : null}
+                          {invoice.status !== 'paid' ? <Feather name="check" size={12} color={colors.primaryDark} /> : null}
                         </Pressable>
                       </View>
                     </View>
@@ -228,65 +231,75 @@ export default function InvoicesScreen() {
   );
 }
 
-function FilterPill({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+function FilterPill({
+  label,
+  selected,
+  onPress,
+  palette,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+  palette: ReturnType<typeof useAppTheme>['colors'];
+}) {
   return (
-    <Pressable onPress={onPress} style={[styles.filterPill, selected && styles.filterPillSelected]}>
-      <Text style={[styles.filterLabel, selected && styles.filterLabelSelected]}>{label}</Text>
+    <Pressable
+      onPress={onPress}
+      style={[
+        styles.filterPill,
+        { backgroundColor: selected ? palette.primary : palette.surface, borderColor: selected ? palette.primary : palette.border },
+      ]}
+    >
+      <Text style={[styles.filterLabel, { color: selected ? '#FFFFFF' : palette.textMuted }]}>{label}</Text>
     </Pressable>
   );
 }
 
-const INK = '#1C1917';
-const ORANGE = '#FB923C';
 const styles = StyleSheet.create({
-  screen: { backgroundColor: '#FAF5EE' },
+  screen: { backgroundColor: 'transparent' },
   content: { padding: 20, paddingBottom: 36 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { color: INK, fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
-  searchToggle: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 9, height: 46, marginTop: 14, paddingHorizontal: 13, borderRadius: 13, backgroundColor: '#FFFFFF' },
-  searchInput: { flex: 1, color: INK, fontSize: 13 },
+  title: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
+  searchToggle: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 9, height: 46, marginTop: 14, paddingHorizontal: 13, borderRadius: 13, borderWidth: 1 },
+  searchInput: { flex: 1, fontSize: 13 },
   filters: { flexDirection: 'row', gap: 8, paddingVertical: 17 },
-  filterPill: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 16, backgroundColor: '#FFFFFF' },
-  filterPillSelected: { backgroundColor: INK },
-  filterLabel: { color: '#78716C', fontWeight: '700', fontSize: 12 },
-  filterLabelSelected: { color: '#FFFFFF' },
-  reminder: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, marginBottom: 12, borderRadius: 16, backgroundColor: '#FFEDD5' },
-  reminderIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: ORANGE },
+  filterPill: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 16, borderWidth: 1 },
+  filterLabel: { fontWeight: '700', fontSize: 12 },
+  reminder: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, marginBottom: 12, borderRadius: 16, borderWidth: 1 },
+  reminderIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   reminderCopy: { flex: 1 },
-  reminderTitle: { color: INK, fontSize: 12, fontWeight: '800' },
-  reminderSub: { color: '#78716C', fontSize: 11, marginTop: 3 },
-  reminderButton: { backgroundColor: INK, borderRadius: 10, paddingHorizontal: 13, paddingVertical: 9 },
+  reminderTitle: { fontSize: 12, fontWeight: '800' },
+  reminderSub: { fontSize: 11, marginTop: 3 },
+  reminderButton: { borderRadius: 10, paddingHorizontal: 13, paddingVertical: 9 },
   reminderButtonLabel: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
-  groupTitle: { color: '#78716C', fontSize: 12, fontWeight: '700', marginTop: 12, marginBottom: 8 },
-  invoiceCard: { padding: 14, marginBottom: 9, backgroundColor: '#FFFFFF', borderRadius: 17 },
+  groupTitle: { fontSize: 12, fontWeight: '700', marginTop: 12, marginBottom: 8 },
+  invoiceCard: { padding: 14, marginBottom: 9, borderRadius: 17, borderWidth: 1 },
   invoiceMain: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFEDD5', alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#9A3412', fontSize: 13, fontWeight: '800' },
+  avatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 13, fontWeight: '800' },
   invoiceCopy: { flex: 1, minWidth: 0 },
-  clientName: { color: INK, fontSize: 14, fontWeight: '800' },
-  serviceName: { color: '#78716C', fontSize: 11, marginTop: 3 },
-  invoiceNumber: { color: '#A8A29E', fontSize: 10, marginTop: 3 },
-  amount: { color: INK, fontSize: 13, fontWeight: '800' },
-  cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F5F5F4' },
+  clientName: { fontSize: 14, fontWeight: '800' },
+  serviceName: { fontSize: 11, marginTop: 3 },
+  invoiceNumber: { fontSize: 10, marginTop: 3 },
+  amount: { fontSize: 13, fontWeight: '800' },
+  cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTopWidth: 1 },
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  cardShare: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFEDD5' },
-  issuedDate: { color: '#A8A29E', fontSize: 10 },
+  cardShare: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  issuedDate: { fontSize: 10 },
   statusPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 12 },
-  status_pending: { backgroundColor: '#FFF7ED' },
-  status_overdue: { backgroundColor: '#FEF2F2' },
-  status_paid: { backgroundColor: '#ECFDF5' },
-  status_draft: { backgroundColor: '#F5F5F4' },
-  statusText: { color: '#9A3412', fontSize: 10, fontWeight: '700' },
-  paidText: { color: '#047857' },
-  empty: { textAlign: 'center', color: '#78716C', marginTop: 42, fontSize: 13 },
+  statusText: { fontSize: 10, fontWeight: '700' },
+  empty: { textAlign: 'center', marginTop: 42, fontSize: 13 },
   notice: { padding: 13, borderRadius: 12, backgroundColor: '#FEF2F2' },
-  noticeText: { color: '#991B1B', fontSize: 12, textAlign: 'center' },
+  noticeText: { fontSize: 12, textAlign: 'center' },
 });
 
-const statusStyles: Record<InvoiceStatus, object> = {
-  pending: styles.status_pending,
-  overdue: styles.status_overdue,
-  paid: styles.status_paid,
-  draft: styles.status_draft,
-};
+function statusColor(
+  status: InvoiceStatus,
+  palette: ReturnType<typeof useAppTheme>['colors']
+) {
+  if (status === 'paid') return { backgroundColor: palette.successSoft, color: palette.success };
+  if (status === 'overdue') return { backgroundColor: palette.dangerSoft, color: palette.danger };
+  if (status === 'pending') return { backgroundColor: palette.primarySoft, color: palette.primaryDark };
+  return { backgroundColor: palette.neutralSoft, color: palette.textMuted };
+}

@@ -4,7 +4,7 @@ import { Logo } from '@/components/Logo';
 import { Screen } from '@/components/Screen';
 import { colors } from '@/constants/theme';
 import { useApp } from '@/context/AppContext';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import {
@@ -20,11 +20,13 @@ import {
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { email: emailParam } = useLocalSearchParams<{ email?: string | string[] }>();
   const { login } = useApp();
 
-  // Prefilled for easy testing — any valid email + 6+ char password works.
-  const [email, setEmail] = useState('arben@voicebill.app');
-  const [password, setPassword] = useState('demo1234');
+  const [email, setEmail] = useState(() =>
+    Array.isArray(emailParam) ? '' : emailParam ?? ''
+  );
+  const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [loading, setLoading] = useState(false);
 
@@ -40,9 +42,17 @@ export default function LoginScreen() {
       await login(email.trim(), password);
       router.replace('/tabs');
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Kontrollo lidhjen dhe të dhënat e hyrjes.';
+      if (/email not confirmed/i.test(message)) {
+        Alert.alert(
+          'Llogaria kërkon aktivizim',
+          'Çaktivizimi i konfirmimit vlen për regjistrimet e reja; kjo llogari e vjetër duhet konfirmuar nga Supabase Dashboard te Authentication > Users.'
+        );
+        return;
+      }
       Alert.alert(
         'Hyrja dështoi',
-        error instanceof Error ? error.message : 'Kontrollo lidhjen dhe të dhënat e hyrjes.'
+        message
       );
     } finally {
       setLoading(false);

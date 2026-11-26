@@ -3,8 +3,9 @@ import { MiniBarChart } from '@/components/MiniBarChart';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { StatCard } from '@/components/StatCard';
-import { colors, radius, shadow } from '@/constants/theme';
+import { radius, shadow } from '@/constants/theme';
 import { useApp } from '@/context/AppContext';
+import { useAppTheme } from '@/components/useAppTheme';
 import {
     calcTotals,
     currentMonthName,
@@ -15,13 +16,36 @@ import {
 } from '@/utils/format';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function DashboardScreen() {
   const router = useRouter();
   const { user, invoices, getCustomer, invoicesLoading, invoicesError, refreshInvoices } = useApp();
+  const { colors, darkMode } = useAppTheme();
+  const [currentHour, setCurrentHour] = useState(() => new Date().getHours());
   const firstName = user?.fullName.split(' ')[0] ?? '';
+  const greeting =
+    currentHour >= 18
+      ? 'Mirëmbrëma'
+      : currentHour >= 12
+        ? 'Mirëdita'
+        : 'Mirëmëngjes';
+
+  useEffect(() => {
+    const updateHour = () => {
+      const hour = new Date().getHours();
+      setCurrentHour((current) => (current === hour ? current : hour));
+    };
+    const timer = setInterval(updateHour, 60_000);
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') updateHour();
+    });
+    return () => {
+      clearInterval(timer);
+      appStateSubscription.remove();
+    };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -78,11 +102,11 @@ export default function DashboardScreen() {
         {/* Top row */}
         <View style={styles.topRow}>
           <View>
-            <Text style={styles.date}>{todayLabel()}</Text>
-            <Text style={styles.greeting}>Mirëdita, {firstName}</Text>
+            <Text style={[styles.date, { color: colors.textMuted }]}>{todayLabel()}</Text>
+            <Text style={[styles.greeting, { color: colors.text }]}>{greeting}, {firstName}</Text>
           </View>
           <Pressable
-            style={styles.bell}
+            style={[styles.bell, { backgroundColor: colors.surface, borderColor: colors.border }]}
             onPress={() =>
               Alert.alert(
                 'Njoftimet',
@@ -97,9 +121,9 @@ export default function DashboardScreen() {
         </View>
 
         {/* Revenue card */}
-        <View style={styles.revenueCard}>
+        <View style={[styles.revenueCard, { backgroundColor: darkMode ? '#131B2E' : colors.dark, borderColor: darkMode ? colors.border : colors.dark }]}>
           <View style={styles.revenueTop}>
-            <Text style={styles.revenueLabel}>Të ardhura · {currentMonthName()}</Text>
+            <Text style={[styles.revenueLabel, { color: colors.textOnDarkMuted }]}>Të ardhura · {currentMonthName()}</Text>
             {stats.growth !== null ? (
               <View style={styles.growth}>
                 <Text style={styles.growthText}>
@@ -109,16 +133,16 @@ export default function DashboardScreen() {
               </View>
             ) : null}
           </View>
-          <Text style={styles.revenueValue}>{formatMoneyCompact(stats.revenue)}</Text>
+          <Text style={[styles.revenueValue, { color: colors.textOnDark, fontVariant: ['tabular-nums'] }]}>{formatMoneyCompact(stats.revenue)}</Text>
           <MiniBarChart values={stats.chart} />
-          <Text style={styles.revenueCaption}>7 ditët e fundit</Text>
+          <Text style={[styles.revenueCaption, { color: colors.textOnDarkMuted }]}>7 ditët e fundit</Text>
         </View>
 
         {/* Stats */}
         <View style={styles.statsRow}>
           <StatCard
             label="Në pritje"
-            dotColor={colors.primary}
+            dotColor="#F59E0B"
             value={formatMoneyCompact(stats.openTotal)}
             sub={`${stats.openCount} fatura`}
           />
@@ -133,9 +157,9 @@ export default function DashboardScreen() {
         {/* Voice CTA */}
         <Pressable
           onPress={() => router.push('/invoice')}
-          style={({ pressed }) => [styles.cta, pressed && { opacity: 0.9 }]}
+          style={({ pressed }) => [styles.cta, { backgroundColor: '#F97316' }, pressed && { opacity: 0.9 }]}
         >
-          <View style={styles.ctaIcon}>
+          <View style={[styles.ctaIcon, { backgroundColor: '#C2410C' }]}>
             <Feather name="mic" size={22} color="#FFFFFF" />
           </View>
           <View style={{ flex: 1 }}>
@@ -152,17 +176,17 @@ export default function DashboardScreen() {
           onAction={() => router.push('/tabs/invoices')}
         />
         {invoicesError ? (
-          <Pressable onPress={() => void refreshInvoices()} style={styles.invoiceNotice}>
-            <Text style={styles.invoiceNoticeText}>
+          <Pressable onPress={() => void refreshInvoices()} style={[styles.invoiceNotice, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.invoiceNoticeText, { color: colors.textMuted }]}>
               Nuk u ngarkuan faturat nga Supabase. Prek për të provuar përsëri.
             </Text>
           </Pressable>
         ) : null}
         {invoicesLoading && invoices.length === 0 ? (
-          <Text style={styles.invoiceNoticeText}>Po ngarkohen faturat…</Text>
+          <Text style={[styles.invoiceNoticeText, { color: colors.textMuted }]}>Po ngarkohen faturat…</Text>
         ) : null}
         {!invoicesLoading && !invoicesError && invoices.length === 0 ? (
-          <Text style={styles.invoiceNoticeText}>Nuk ka ende fatura.</Text>
+          <Text style={[styles.invoiceNoticeText, { color: colors.textMuted }]}>Nuk ka ende fatura.</Text>
         ) : null}
         {recent.map((inv) => (
           <InvoiceRow
@@ -181,36 +205,32 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 32 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  date: { fontSize: 12, color: colors.textMuted },
-  greeting: { fontSize: 24, fontWeight: '800', color: colors.text, marginTop: 2, letterSpacing: -0.4 },
+  date: { fontSize: 12 },
+  greeting: { fontSize: 24, fontWeight: '800', marginTop: 2, letterSpacing: -0.4 },
   bell: {
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   revenueCard: {
-    backgroundColor: colors.dark,
     borderRadius: radius.lg,
     padding: 18,
     marginTop: 18,
   },
   revenueTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  revenueLabel: { color: colors.textOnDarkMuted, fontSize: 12, flexShrink: 1 },
+  revenueLabel: { fontSize: 12, flexShrink: 1 },
   growth: { backgroundColor: 'rgba(23,160,106,0.18)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   growthText: { color: '#3DDC97', fontSize: 11, fontWeight: '700' },
-  revenueValue: { color: '#FFFFFF', fontSize: 36, fontWeight: '800', marginVertical: 8, letterSpacing: -1 },
-  revenueCaption: { color: colors.textOnDarkMuted, fontSize: 11, marginTop: 10 },
+  revenueValue: { fontSize: 36, fontWeight: '800', marginVertical: 8, letterSpacing: -1 },
+  revenueCaption: { fontSize: 11, marginTop: 10 },
   statsRow: { flexDirection: 'row', gap: 12, marginTop: 14 },
   cta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: colors.primary,
     borderRadius: radius.lg,
     padding: 14,
     marginTop: 14,
@@ -220,7 +240,6 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: colors.dark,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -230,7 +249,8 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 10,
     borderRadius: radius.md,
-    backgroundColor: colors.surface,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
   },
-  invoiceNoticeText: { color: colors.textMuted, fontSize: 13, marginVertical: 8 },
+  invoiceNoticeText: { fontSize: 13, marginVertical: 8 },
 });
