@@ -28,7 +28,7 @@ interface Errors {
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { register } = useApp();
+  const { register, resendSignupConfirmation } = useApp();
 
   const [fullName, setFullName] = useState('');
   const [businessName, setBusinessName] = useState('');
@@ -56,13 +56,25 @@ export default function RegisterScreen() {
       );
       if (!sessionCreated) {
         Alert.alert(
-          'Konfirmo emailin',
-          `Kontrollo emailin ${email.trim()} dhe konfirmo llogarinë. Pastaj kyçu për të parë profilin dhe faturat.`,
+          'Kontrollo Gmail-in',
+          `Dërguam një lidhje konfirmimi te ${email.trim()}. Hap lidhjen nga telefoni për ta aktivizuar llogarinë dhe për t’u kthyer automatikisht në VoiceBill. Kontrollo edhe dosjen Spam.`,
           [
             {
-              text: 'Shko te hyrja',
-              onPress: () =>
-                router.replace({ pathname: '/auth/login', params: { email: email.trim() } }),
+              text: 'Ridërgo emailin',
+              onPress: () => {
+                void resendSignupConfirmation(email).then(
+                  () => Alert.alert('Emaili u ridërgua', 'Kontrollo Inbox dhe Spam në Gmail.'),
+                  (error: unknown) =>
+                    Alert.alert(
+                      'Emaili nuk u ridërgua',
+                      error instanceof Error ? error.message : 'Provo përsëri më vonë.'
+                    )
+                );
+              },
+            },
+            {
+              text: 'Në rregull',
+              style: 'cancel',
             },
           ]
         );

@@ -21,7 +21,7 @@ import {
 export default function LoginScreen() {
   const router = useRouter();
   const { email: emailParam } = useLocalSearchParams<{ email?: string | string[] }>();
-  const { login } = useApp();
+  const { login, resendSignupConfirmation } = useApp();
 
   const [email, setEmail] = useState(() =>
     Array.isArray(emailParam) ? '' : emailParam ?? ''
@@ -45,8 +45,24 @@ export default function LoginScreen() {
       const message = error instanceof Error ? error.message : 'Kontrollo lidhjen dhe të dhënat e hyrjes.';
       if (/email not confirmed/i.test(message)) {
         Alert.alert(
-          'Llogaria kërkon aktivizim',
-          'Çaktivizimi i konfirmimit vlen për regjistrimet e reja; kjo llogari e vjetër duhet konfirmuar nga Supabase Dashboard te Authentication > Users.'
+          'Konfirmo emailin',
+          'Llogaria pret konfirmimin e adresës. Ridërgo lidhjen dhe hape në telefon; pas konfirmimit VoiceBill do të kyçet automatikisht.',
+          [
+            { text: 'Mbyll', style: 'cancel' },
+            {
+              text: 'Ridërgo emailin',
+              onPress: () => {
+                void resendSignupConfirmation(email).then(
+                  () => Alert.alert('Emaili u ridërgua', 'Kontrollo Inbox dhe Spam në Gmail.'),
+                  (resendError: unknown) =>
+                    Alert.alert(
+                      'Emaili nuk u ridërgua',
+                      resendError instanceof Error ? resendError.message : 'Provo përsëri më vonë.'
+                    )
+                );
+              },
+            },
+          ]
         );
         return;
       }

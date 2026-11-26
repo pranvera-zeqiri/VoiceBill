@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { customerService } from '@/services/costumerService';
 import type { NewCustomerInput } from '@/services/costumerService';
@@ -52,6 +53,7 @@ interface AppContextValue {
   authReady: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (input: RegisterInput, password: string) => Promise<boolean>;
+  resendSignupConfirmation: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (patch: Partial<User>) => Promise<void>;
 
@@ -230,6 +232,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           full_name: input.fullName.trim(),
           business_name: input.businessName.trim(),
         },
+        emailRedirectTo: Linking.createURL('auth/callback'),
       },
     });
     if (error) throw error;
@@ -237,6 +240,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUser(mapAuthUser(data.session.user));
     setAuthReady(true);
     return true;
+  }, []);
+
+  const resendSignupConfirmation = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim(),
+      options: { emailRedirectTo: Linking.createURL('auth/callback') },
+    });
+    if (error) throw error;
   }, []);
 
   const logout = useCallback(async () => {
@@ -351,6 +363,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       authReady,
       login,
       register,
+      resendSignupConfirmation,
       logout,
       updateUser,
       settings,
@@ -372,6 +385,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       user, authReady, login, register, logout, updateUser, settings, updateSettings,
+      resendSignupConfirmation,
       darkMode, updateDarkMode,
       customers, invoices, invoicesLoading, invoicesError, refreshInvoices,
       getCustomer, getInvoice, getCustomerStats,

@@ -13,6 +13,7 @@
     "expo-asset": "~58.0.21",
     "expo-audio": "~58.0.12",
     "expo-constants": "~58.0.15",
+    "expo-crypto": "~58.0.9",
     "expo-device": "~58.0.5",
     "expo-font": "~58.0.11",
     "expo-glass-effect": "~58.0.6",
@@ -23,6 +24,7 @@
     "expo-router": "~58.0.33",
     "expo-sharing": "~58.0.24",
     "expo-splash-screen": "~58.0.15",
+    "expo-standard-web-crypto": "^58.0.7",
     "expo-status-bar": "~58.0.5",
     "expo-symbols": "~58.0.5",
     "expo-system-ui": "~58.0.7",
@@ -38,7 +40,8 @@
     "react-native-svg": "15.16.0",
     "react-native-url-polyfill": "^4.0.0",
     "react-native-web": "~0.21.4",
-    "react-native-worklets": "0.13.0"
+    "react-native-worklets": "0.13.0",
+    "text-encoding": "^0.7.0"
   },
   "devDependencies": {
     "@types/react": "~19.3.0",
