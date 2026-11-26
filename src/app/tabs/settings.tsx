@@ -19,18 +19,34 @@ export default function SettingsScreen() {
   const [businessName, setBusinessName] = useState(user?.businessName ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
   const [taxId, setTaxId] = useState(user?.taxId ?? '');
+  const [bankName, setBankName] = useState(user?.bankName ?? '');
+  const [iban, setIban] = useState(user?.iban ?? '');
+  const [savingProfile, setSavingProfile] = useState(false);
 
-  const save = () => {
+  const save = async () => {
     if (fullName.trim().length < 2 || businessName.trim().length < 2) {
       return Alert.alert('Të dhëna të pakompletuara', 'Emri dhe emri i biznesit janë të detyrueshëm.');
     }
-    updateUser({
-      fullName: fullName.trim(),
-      businessName: businessName.trim(),
-      phone: phone.trim(),
-      taxId: taxId.trim(),
-    });
-    Alert.alert('U ruajt', 'Ndryshimet u ruajtën me sukses.');
+    setSavingProfile(true);
+    try {
+      await updateUser({
+        fullName: fullName.trim(),
+        businessName: businessName.trim(),
+        phone: phone.trim(),
+        taxId: taxId.trim(),
+        bankName: bankName.trim(),
+        iban: iban.replace(/\s+/g, '').toUpperCase(),
+      });
+      setIban((value) => value.replace(/\s+/g, '').toUpperCase());
+      Alert.alert('U ruajt', 'Ndryshimet u ruajtën me sukses.');
+    } catch (error) {
+      Alert.alert(
+        'Profili nuk u ruajt',
+        error instanceof Error ? error.message : 'Kontrollo lidhjen dhe provo përsëri.'
+      );
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   const onLogout = () =>
@@ -70,7 +86,16 @@ export default function SettingsScreen() {
           <Input label="Emri i biznesit" value={businessName} onChangeText={setBusinessName} />
           <Input label="Telefoni" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
           <Input label="Numri fiskal" keyboardType="number-pad" value={taxId} onChangeText={setTaxId} />
-          <Button label="Ruaj ndryshimet" onPress={save} />
+          <Input label="Banka" value={bankName} onChangeText={setBankName} placeholder="Emri i bankës (opsional)" />
+          <Input
+            label="IBAN"
+            value={iban}
+            onChangeText={setIban}
+            placeholder="IBAN (opsional)"
+            autoCapitalize="characters"
+            autoCorrect={false}
+          />
+          <Button label="Ruaj ndryshimet" onPress={() => void save()} loading={savingProfile} />
         </View>
 
         <Text style={styles.section}>Faturimi</Text>

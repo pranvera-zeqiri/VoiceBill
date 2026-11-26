@@ -193,7 +193,12 @@ export default function InvoicesScreen() {
                       <View style={styles.cardActions}>
                         <Pressable
                           accessibilityLabel={`Shpërndaj PDF-në e faturës ${invoice.number}`}
-                          onPress={() => void generateAndShareInvoicePdf(invoice, clientName, user?.businessName ?? 'VoiceBill').catch((error) => {
+                          onPress={() => void generateAndShareInvoicePdf(
+                            invoice,
+                            clientName,
+                            user?.businessName ?? 'VoiceBill',
+                            { bankName: user?.bankName, iban: user?.iban }
+                          ).catch((error) => {
                             Alert.alert('PDF-ja nuk u krijua', error instanceof Error ? error.message : 'Provo përsëri.');
                           })}
                           style={styles.cardShare}

@@ -4,15 +4,19 @@ import { StatusBadge } from '@/components/statusBadge';
 import { colors, radius } from '@/constants/theme';
 import { useApp } from '@/context/AppContext';
 import { calcTotals, formatDate, formatMoney, formatSavedDate, formatTime } from '@/utils/format';
+import { invoiceService } from '@/services/invoiceService';
 import { generateAndShareInvoicePdf, shareInvoice } from '@/utils/share';
 import { Feather } from '@expo/vector-icons';
+import QRCode from 'react-native-qrcode-svg';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
 
 export default function InvoiceDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { getCustomer, getInvoice, user } = useApp();
+  const { getCustomer, getInvoice, user, refreshInvoices, updateInvoice } = useApp();
+  const [updatingStatus, setUpdatingStatus] = useState(false);
   const invoice = getInvoice(id);
 
   if (!invoice) {
@@ -28,12 +32,20 @@ export default function InvoiceDetailsScreen() {
 
   const customer = getCustomer(invoice.customerId);
   const totals = calcTotals(invoice.items, invoice.vatRate);
+  const iban = user?.iban?.trim() ?? '';
+  const qrValue = JSON.stringify({
+    invoice: invoice.number,
+    amount: totals.total.toFixed(2),
+    currency: 'EUR',
+    ...(iban ? { iban: iban.replace(/\s+/g, '') } : {}),
+  });
   const share = async () => {
     try {
       await shareInvoice(
         invoice,
         customer?.name ?? invoice.customerName ?? 'Klient',
-        user?.businessName ?? 'VoiceBill'
+        user?.businessName ?? 'VoiceBill',
+        { bankName: user?.bankName, iban: user?.iban }
       );
     } catch (error) {
       Alert.alert(
@@ -42,12 +54,34 @@ export default function InvoiceDetailsScreen() {
       );
     }
   };
+  const togglePaidStatus = async () => {
+    if (updatingStatus) return;
+    const nextStatus = invoice.status === 'paid' ? 'pending' : 'paid';
+    setUpdatingStatus(true);
+    try {
+      await invoiceService.updateInvoiceStatus(invoice.id, nextStatus);
+      updateInvoice(invoice.id, { status: nextStatus });
+      await refreshInvoices();
+      Alert.alert(
+        'Statusi u përditësua',
+        nextStatus === 'paid' ? 'Fatura u shënua si e paguar.' : 'Fatura u kthye si e papaguar.'
+      );
+    } catch (error) {
+      Alert.alert(
+        'Statusi nuk u ndryshua',
+        error instanceof Error ? error.message : 'Kontrollo lidhjen me Supabase dhe provo përsëri.'
+      );
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
   const exportPdf = async () => {
     try {
       await generateAndShareInvoicePdf(
         invoice,
         customer?.name ?? invoice.customerName ?? 'Klient',
-        user?.businessName ?? 'VoiceBill'
+        user?.businessName ?? 'VoiceBill',
+        { bankName: user?.bankName, iban: user?.iban }
       );
     } catch (error) {
       Alert.alert(
@@ -88,6 +122,23 @@ export default function InvoiceDetailsScreen() {
           <Text style={styles.date}>Afati i pagesës: {formatDate(invoice.dueDate)}</Text>
         </View>
 
+        {iban ? (
+          <View style={styles.paymentCard}>
+            <Text style={styles.sectionTitle}>Pagesa bankare</Text>
+            {user?.bankName ? <Text style={styles.paymentText}>Banka: {user.bankName}</Text> : null}
+            <Text style={styles.paymentText}>IBAN: {iban}</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.qrCard}>
+          <QRCode value={qrValue} size={156} />
+          <Text style={styles.qrTitle}>Detajet e pagesës</Text>
+          <Text style={styles.qrCaption}>
+            Fatura #{invoice.number} · {formatMoney(totals.total)}
+          </Text>
+          {iban ? <Text style={styles.qrCaption}>IBAN: {iban}</Text> : null}
+        </View>
+
         <Text style={styles.sectionTitle}>Artikujt</Text>
         <View style={styles.items}>
           {invoice.items.map((item) => (
@@ -116,6 +167,23 @@ export default function InvoiceDetailsScreen() {
           <Text style={styles.pdfButtonText}>Ruaj PDF / Dërgo</Text>
           <Feather name="send" size={17} color="#FFFFFF" />
         </Pressable>
+        {invoice.status !== 'draft' ? (
+          <Pressable
+            accessibilityLabel={invoice.status === 'paid' ? 'Kthe faturën në të papaguar' : 'Shëno faturën si të paguar'}
+            disabled={updatingStatus}
+            onPress={() => void togglePaidStatus()}
+            style={[styles.statusButton, updatingStatus && styles.disabledButton]}
+          >
+            <Feather name={invoice.status === 'paid' ? 'rotate-ccw' : 'check-circle'} size={18} color="#FFFFFF" />
+            <Text style={styles.statusButtonText}>
+              {updatingStatus
+                ? 'Po ruhet...'
+                : invoice.status === 'paid'
+                  ? 'Ktheje si të papaguar'
+                  : 'Shëno si të paguar'}
+            </Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
     </Screen>
   );
@@ -191,6 +259,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   pdfButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+  paymentCard: { padding: 16, marginTop: 16, borderRadius: radius.md, backgroundColor: colors.surface },
+  paymentText: { color: colors.text, fontSize: 13, marginTop: 8, fontWeight: '600' },
+  qrCard: { alignItems: 'center', gap: 8, padding: 18, marginTop: 16, borderRadius: radius.md, backgroundColor: colors.surface },
+  qrTitle: { color: colors.text, fontSize: 15, fontWeight: '800', marginTop: 6 },
+  qrCaption: { color: colors.textMuted, fontSize: 12, textAlign: 'center' },
+  statusButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    minHeight: 52,
+    marginTop: 12,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+  },
+  statusButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
+  disabledButton: { opacity: 0.6 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   emptyText: { color: colors.textMuted, fontSize: 14 },
 });

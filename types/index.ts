@@ -46,6 +46,8 @@ export interface User {
   email: string;
   phone: string;
   taxId: string;
+  bankName: string;
+  iban: string;
 }
 
 export interface Settings {

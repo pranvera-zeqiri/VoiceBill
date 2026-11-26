@@ -16,7 +16,8 @@ function escapeHtml(value: unknown) {
 export async function generateAndShareInvoicePdf(
   invoice: Invoice,
   customerName: string,
-  businessName: string
+  businessName: string,
+  paymentDetails?: { bankName?: string; iban?: string }
 ) {
   const totals = calcTotals(invoice.items, invoice.vatRate);
   const workHours = invoice.items
@@ -32,6 +33,13 @@ export async function generateAndShareInvoicePdf(
         <td>${escapeHtml(formatMoney(subtotal))}</td>
       </tr>`;
   }).join('');
+  const paymentDetailsHtml = paymentDetails?.iban
+    ? `<div class="box">
+        <h2>Pagesa bankare</h2>
+        ${paymentDetails.bankName ? `<div><strong>Banka:</strong> ${escapeHtml(paymentDetails.bankName)}</div>` : ''}
+        <div style="margin-top:8px"><strong>IBAN:</strong> ${escapeHtml(paymentDetails.iban)}</div>
+      </div>`
+    : '';
 
   const html = `
     <html>
@@ -78,6 +86,7 @@ export async function generateAndShareInvoicePdf(
           ${totals.vat > 0 ? `<div class="row"><span>TVSH ${escapeHtml(invoice.vatRate)}%</span><strong>${escapeHtml(formatMoney(totals.vat))}</strong></div>` : ''}
           <div class="row grand"><span>Totali në EUR</span><span>${escapeHtml(formatMoney(totals.total))}</span></div>
         </div>
+        ${paymentDetailsHtml}
       </body>
     </html>`;
 
@@ -94,7 +103,8 @@ export async function generateAndShareInvoicePdf(
 export async function shareInvoice(
   invoice: Invoice,
   customerName: string,
-  businessName: string
+  businessName: string,
+  paymentDetails?: { bankName?: string; iban?: string }
 ): Promise<boolean> {
   const t = calcTotals(invoice.items, invoice.vatRate);
   const lines = invoice.items.map(
@@ -108,6 +118,12 @@ export async function shareInvoice(
     `Për: ${customerName}`,
     `Data: ${invoice.createdAt ? formatSavedDate(invoice.createdAt) : formatDate(invoice.date)}`,
     `Ora: ${invoice.createdAt ? formatTime(invoice.createdAt) : '--:--'}`,
+    ...(paymentDetails?.iban
+      ? [
+          ...(paymentDetails.bankName ? [`Banka: ${paymentDetails.bankName}`] : []),
+          `IBAN: ${paymentDetails.iban}`,
+        ]
+      : []),
     '',
     ...lines,
     '',

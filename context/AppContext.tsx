@@ -52,7 +52,7 @@ interface AppContextValue {
   login: (email: string, password: string) => Promise<void>;
   register: (input: RegisterInput, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  updateUser: (patch: Partial<User>) => void;
+  updateUser: (patch: Partial<User>) => Promise<void>;
 
   settings: Settings;
   updateSettings: (patch: Partial<Settings>) => void;
@@ -134,8 +134,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           fullName: session.user.user_metadata?.full_name || 'Zejtar',
           businessName: session.user.user_metadata?.business_name || 'Servis',
           email: session.user.email || '',
-          phone: '',
-          taxId: '',
+          phone: session.user.user_metadata?.phone || '',
+          taxId: session.user.user_metadata?.tax_id || '',
+          bankName: session.user.user_metadata?.bank_name || '',
+          iban: session.user.user_metadata?.iban || '',
         });
         if (authChangeTimeout) clearTimeout(authChangeTimeout);
         authChangeTimeout = setTimeout(() => {
@@ -208,10 +210,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
-  const updateUser = useCallback(
-    (patch: Partial<User>) => setUser((prev) => (prev ? { ...prev, ...patch } : prev)),
-    []
-  );
+  const updateUser = useCallback(async (patch: Partial<User>) => {
+    const { data: sessionData, error: sessionError } = await supabase.auth.getUser();
+    if (sessionError) throw sessionError;
+    if (!sessionData.user) throw new Error('Duhet të kyçeni për të ruajtur profilin.');
+
+    const current: User = {
+      fullName: sessionData.user.user_metadata?.full_name || 'Zejtar',
+      businessName: sessionData.user.user_metadata?.business_name || 'Servis',
+      email: sessionData.user.email || '',
+      phone: sessionData.user.user_metadata?.phone || '',
+      taxId: sessionData.user.user_metadata?.tax_id || '',
+      bankName: sessionData.user.user_metadata?.bank_name || '',
+      iban: sessionData.user.user_metadata?.iban || '',
+    };
+    const next = { ...current, ...patch };
+    const { error } = await supabase.auth.updateUser({
+      data: {
+        ...sessionData.user.user_metadata,
+        full_name: next.fullName,
+        business_name: next.businessName,
+        phone: next.phone,
+        tax_id: next.taxId,
+        bank_name: next.bankName,
+        iban: next.iban,
+      },
+    });
+    if (error) throw error;
+    setUser(next);
+  }, []);
 
   const updateSettings = useCallback(
     (patch: Partial<Settings>) => setSettings((prev) => ({ ...prev, ...patch })),
