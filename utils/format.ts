@@ -36,6 +36,29 @@ export const formatDate = (iso: string) => {
   return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 };
 
+export const formatDateTime = (iso: string) =>
+  new Intl.DateTimeFormat('sq-AL', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(iso));
+
+export const formatSavedDate = (iso: string) =>
+  new Intl.DateTimeFormat('sq-AL', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(iso));
+
+export const formatTime = (iso: string) =>
+  new Intl.DateTimeFormat('sq-AL', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(new Date(iso));
+
 export const formatMonthYear = (iso: string) => {
   const d = parseISO(iso);
   return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;

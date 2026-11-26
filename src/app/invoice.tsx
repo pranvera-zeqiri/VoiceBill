@@ -1,4 +1,5 @@
 import { invoiceService } from '@/services/invoiceService';
+import { useApp } from '@/context/AppContext';
 import { Feather } from '@expo/vector-icons';
 import {
   RecordingPresets,
@@ -23,7 +24,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ORANGE = '#FB923C';
 const BAR_COUNT = 35;
-const TRANSCRIPTION_CHUNK_MS = 7000;
+const TRANSCRIPTION_CHUNK_MS = 2000;
 const RECORDING_OPTIONS = { ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true };
 
 function formatTimer(seconds: number) {
@@ -32,6 +33,7 @@ function formatTimer(seconds: number) {
 
 export default function VoiceInvoiceScreen() {
   const router = useRouter();
+  const { refreshInvoices } = useApp();
   const mountedRef = useRef(true);
   const processingRef = useRef(false);
   const chunkingRef = useRef(false);
@@ -133,21 +135,25 @@ export default function VoiceInvoiceScreen() {
     await recorder.prepareToRecordAsync();
     if (!mountedRef.current) return;
     recorder.record();
+
     segmentStartedAtRef.current = Date.now();
     if (mountedRef.current) setRecording(true);
   }, [recorder, router]);
 
   useEffect(() => {
     mountedRef.current = true;
-    void startRecording().catch((error: unknown) => {
-      console.error('Nuk mund të niste regjistrimi audio:', error);
-      Alert.alert(
-        'Regjistrimi dështoi',
-        error instanceof Error ? error.message : 'Kontrollo lejen e mikrofonit dhe provo përsëri.'
-      );
-      router.back();
-    });
+    const startTimer = setTimeout(() => {
+      void startRecording().catch((error: unknown) => {
+        console.error('Nuk mund të niste regjistrimi audio:', error);
+        Alert.alert(
+          'Regjistrimi dështoi',
+          error instanceof Error ? error.message : 'Kontrollo lejen e mikrofonit dhe provo përsëri.'
+        );
+        router.back();
+      });
+    }, 0);
     return () => {
+      clearTimeout(startTimer);
       mountedRef.current = false;
       if (recorder.getStatus().isRecording) {
         void recorder.stop().catch((error: unknown) => {
@@ -172,7 +178,7 @@ export default function VoiceInvoiceScreen() {
     }, TRANSCRIPTION_CHUNK_MS);
     return () => {
       clearInterval(timer);
-      clearInterval(chunkTimer);
+      if (chunkTimer) clearInterval(chunkTimer);
     };
   }, [paused, processing, recording, rotateChunk]);
 
@@ -210,6 +216,7 @@ export default function VoiceInvoiceScreen() {
         setPaused(false);
         setAudioUri(uri);
       }
+
       const durationSeconds = Math.floor(elapsedMillisRef.current / 1000);
       setTimerSeconds(durationSeconds);
       await queuedTranscriptionsRef.current;
@@ -222,22 +229,37 @@ export default function VoiceInvoiceScreen() {
           setTranscribedSegmentCount(transcriptPartsRef.current.length);
         }
       }
-      const transcript = transcriptPartsRef.current.join(' ').trim();
-      if (!uri && !transcript) throw new Error('Nuk u gjet regjistrimi audio ose transkripti.');
-      if (!transcript) {
-        if (uri) {
-          await setAudioModeAsync({ allowsRecording: false });
-          const result = await invoiceService.transcribeAndExtractInvoice(uri, durationSeconds);
-          router.push({ pathname: '/add-bill', params: { draft: JSON.stringify(result) } });
-          return;
-        }
-        throw new Error('Nuk u njoh të folurit. Fol pak më qartë dhe provo përsëri.');
-      }
+      const finalUri = uri;
+      if (!finalUri) throw new Error('Nuk u gjet regjistrimi audio ose transkripti.');
+
       await setAudioModeAsync({ allowsRecording: false });
-      router.push({
-        pathname: '/add-bill',
-        params: { transcript, durationSeconds: String(durationSeconds) },
-      });
+
+      const fallbackTranscript = transcriptPartsRef.current.join(' ').trim();
+      const result = fallbackTranscript
+        ? await invoiceService.extractInvoiceFromTranscript(fallbackTranscript, durationSeconds)
+        : await invoiceService.transcribeAndExtractInvoice(finalUri, durationSeconds);
+      const invoiceItems = result.items.map((item) => ({
+        title: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        unitPrice: item.unit_price,
+        needsConfirm: false,
+      }));
+      if (!result.client_name.trim()) {
+        throw new Error('AI nuk identifikoi emrin e klientit nga regjistrimi. Provo të thuash emrin më qartë.');
+      }
+      if (!invoiceItems.length) {
+        throw new Error('AI nuk identifikoi asnjë zë faturimi nga regjistrimi.');
+      }
+
+      const invoice = await invoiceService.createVoiceInvoice(
+        { ...result, status: 'unpaid' } as typeof result,
+        invoiceItems
+      );
+      await refreshInvoices();
+      Alert.alert('Fatura u krijua', 'Fatura u ruajt në Supabase dhe është gati për PDF.', [
+        { text: 'Shiko faturën', onPress: () => router.replace(`/invoice/${invoice.id}`) },
+      ]);
     } catch (error) {
       Alert.alert(
         'Nuk u analizua regjistrimi',

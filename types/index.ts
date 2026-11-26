@@ -21,6 +21,7 @@ export interface Invoice {
   customerName?: string;
   title: string;
   date: string; // YYYY-MM-DD
+  createdAt?: string;
   dueDate: string; // YYYY-MM-DD
   status: InvoiceStatus;
   items: InvoiceItem[];

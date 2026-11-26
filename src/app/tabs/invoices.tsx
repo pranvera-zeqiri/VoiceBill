@@ -15,7 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { shareReminder } from '@/utils/share';
+import { generateAndShareInvoicePdf, shareReminder } from '@/utils/share';
 
 type Filter = 'all' | 'open' | 'paid';
 
@@ -34,7 +34,7 @@ function displayStatus(invoice: Invoice): InvoiceStatus {
 
 export default function InvoicesScreen() {
   const router = useRouter();
-  const { invoices, getCustomer, invoicesLoading, invoicesError, refreshInvoices } = useApp();
+  const { invoices, getCustomer, invoicesLoading, invoicesError, refreshInvoices, user } = useApp();
   const [filter, setFilter] = useState<Filter>('all');
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState('');
@@ -190,16 +190,27 @@ export default function InvoicesScreen() {
                     </Pressable>
                     <View style={styles.cardFooter}>
                       <Text style={styles.issuedDate}>{new Date(`${invoice.date}T12:00:00`).toLocaleDateString('sq-AL')}</Text>
-                      <Pressable
-                        disabled={invoice.status === 'paid' || updatingId === invoice.id}
-                        onPress={() => void markPaid(invoice)}
-                        style={[styles.statusPill, statusStyles[status]]}
-                      >
-                        <Text style={[styles.statusText, status === 'paid' && styles.paidText]}>
-                          {updatingId === invoice.id ? 'Po ruhet...' : statusLabel[status]}
-                        </Text>
-                        {invoice.status !== 'paid' ? <Feather name="check" size={12} color="#9A3412" /> : null}
-                      </Pressable>
+                      <View style={styles.cardActions}>
+                        <Pressable
+                          accessibilityLabel={`Shpërndaj PDF-në e faturës ${invoice.number}`}
+                          onPress={() => void generateAndShareInvoicePdf(invoice, clientName, user?.businessName ?? 'VoiceBill').catch((error) => {
+                            Alert.alert('PDF-ja nuk u krijua', error instanceof Error ? error.message : 'Provo përsëri.');
+                          })}
+                          style={styles.cardShare}
+                        >
+                          <Feather name="share-2" size={13} color={INK} />
+                        </Pressable>
+                        <Pressable
+                          disabled={invoice.status === 'paid' || updatingId === invoice.id}
+                          onPress={() => void markPaid(invoice)}
+                          style={[styles.statusPill, statusStyles[status]]}
+                        >
+                          <Text style={[styles.statusText, status === 'paid' && styles.paidText]}>
+                            {updatingId === invoice.id ? 'Po ruhet...' : statusLabel[status]}
+                          </Text>
+                          {invoice.status !== 'paid' ? <Feather name="check" size={12} color="#9A3412" /> : null}
+                        </Pressable>
+                      </View>
                     </View>
                   </View>
                 );
@@ -253,6 +264,8 @@ const styles = StyleSheet.create({
   invoiceNumber: { color: '#A8A29E', fontSize: 10, marginTop: 3 },
   amount: { color: INK, fontSize: 13, fontWeight: '800' },
   cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F5F5F4' },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardShare: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFEDD5' },
   issuedDate: { color: '#A8A29E', fontSize: 10 },
   statusPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 12 },
   status_pending: { backgroundColor: '#FFF7ED' },

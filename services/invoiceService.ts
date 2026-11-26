@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { File } from 'expo-file-system';
 import type { Invoice, InvoiceItem, InvoiceStatus } from '@/types';
+import { daysAgoISO, todayISO, toISO } from '@/utils/format';
 
 type InvoiceItemInput = Pick<
   InvoiceItem,
@@ -58,6 +59,7 @@ interface InvoiceRecord {
   customer_id: string | number;
   title: string;
   date: string;
+  created_at?: string | null;
   due_date: string;
   status: InvoiceStatus;
   vat_rate?: number | null;
@@ -78,7 +80,8 @@ function mapInvoice(record: InvoiceRecord): Invoice {
     number: String(record.number),
     customerId: String(record.customer_id),
     title: record.title,
-    date: record.date,
+    date: record.created_at ? toISO(new Date(record.created_at)) : record.date,
+    createdAt: record.created_at ?? undefined,
     dueDate: record.due_date,
     status: record.status,
     customerName: record.customers?.name ?? undefined,
@@ -324,8 +327,8 @@ export const invoiceService = {
       customerId: String(customerId),
       number: String(nextNumber).padStart(4, '0'),
       title: draft.service_summary.trim() || items[0].title,
-      date: new Date().toISOString().slice(0, 10),
-      dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+      date: todayISO(),
+      dueDate: daysAgoISO(-14),
       status: 'pending',
       vatRate: draft.vat_rate,
       fromVoice: true,

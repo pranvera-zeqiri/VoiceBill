@@ -10,19 +10,41 @@ const invoiceSchema = {
   required: [
     'client_name',
     'service_summary',
+    'work_hours',
+    'hourly_rate',
     'hours_worked',
     'materials_cost',
+    'materials',
     'items',
     'subtotal',
     'vat_rate',
     'vat_amount',
     'total',
+    'total_amount',
+    'status',
   ],
   properties: {
     client_name: { type: 'string' },
     service_summary: { type: 'string' },
+    work_hours: { type: 'number' },
+    hourly_rate: { type: 'number' },
     hours_worked: { type: 'number' },
     materials_cost: { type: 'number' },
+    materials: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['name', 'quantity', 'unit_price', 'total'],
+        properties: {
+          name: { type: 'string' },
+          quantity: { type: 'number' },
+          unit_price: { type: 'number' },
+          total: { type: 'number' },
+          total_amount: { type: 'number' },
+        },
+      },
+    },
     items: {
       type: 'array',
       items: {
@@ -42,6 +64,8 @@ const invoiceSchema = {
     vat_rate: { type: 'number' },
     vat_amount: { type: 'number' },
     total: { type: 'number' },
+    total_amount: { type: 'number' },
+    status: { type: 'string', enum: ['unpaid'] },
   },
 };
 
@@ -123,7 +147,7 @@ async function extractInvoice(transcript: string, apiKey: string, useGroq: boole
           {
             role: 'system',
             content:
-              'Extract invoice data from the transcript. Detect its language automatically and preserve names and item descriptions in that language. Return only JSON matching the requested fields. Do not invent a client, quantity, or price; use empty client_name and 0 for unknown numeric values. Include every billable service/material as an item. Use EUR amounts as numbers, set vat_rate to 18 when not stated, and calculate all totals consistently.',
+              'Extract invoice data from the transcript. Detect its language automatically and preserve names and item descriptions in that language. Return only JSON matching the requested fields. Include client_name, work_hours, hourly_rate, materials as {name, quantity, unit_price, total}, total_amount (total), and status "unpaid". Also include the existing items and totals fields. Do not invent a client, quantity, or price; use empty client_name and 0 for unknown numeric values. Include every billable service/material as an item. Use EUR amounts as numbers, set vat_rate to 18 when not stated, and calculate all totals consistently.',
           },
           { role: 'user', content: transcript },
         ],
@@ -145,7 +169,14 @@ async function extractInvoice(transcript: string, apiKey: string, useGroq: boole
     client_name?: unknown;
     service_summary?: unknown;
     hours_worked?: unknown;
+    work_hours?: unknown;
+    hourly_rate?: unknown;
     materials_cost?: unknown;
+    materials?: {
+      name?: unknown;
+      quantity?: unknown;
+      unit_price?: unknown;
+    }[];
     items?: {
       name?: unknown;
       quantity?: unknown;
@@ -176,6 +207,20 @@ async function extractInvoice(transcript: string, apiKey: string, useGroq: boole
   const subtotal = Math.round(items.reduce((sum, item) => sum + item.total, 0) * 100) / 100;
   const vatRate = positiveNumber(parsed.vat_rate, 18);
   const vatAmount = Math.round(subtotal * vatRate) / 100;
+  const workHours = positiveNumber(parsed.work_hours ?? parsed.hours_worked);
+  const totalAmount = Math.round((subtotal + vatAmount) * 100) / 100;
+  const materials = (Array.isArray(parsed.materials) ? parsed.materials : [])
+    .filter((material) => typeof material.name === 'string' && material.name.trim())
+    .map((material) => {
+      const quantity = Math.max(positiveNumber(material.quantity, 1), 0.01);
+      const unitPrice = positiveNumber(material.unit_price);
+      return {
+        name: (material.name as string).trim(),
+        quantity,
+        unit_price: unitPrice,
+        total: Math.round(quantity * unitPrice * 100) / 100,
+      };
+    });
 
   return {
     client_name: typeof parsed.client_name === 'string' ? parsed.client_name.trim() : '',
@@ -183,13 +228,18 @@ async function extractInvoice(transcript: string, apiKey: string, useGroq: boole
       typeof parsed.service_summary === 'string' && parsed.service_summary.trim()
         ? parsed.service_summary.trim()
         : items.map((item) => item.name).join(', '),
+    work_hours: workHours,
+    hourly_rate: positiveNumber(parsed.hourly_rate),
     hours_worked: positiveNumber(parsed.hours_worked),
     materials_cost: positiveNumber(parsed.materials_cost),
+    materials,
     items,
     subtotal,
     vat_rate: vatRate,
     vat_amount: vatAmount,
-    total: Math.round((subtotal + vatAmount) * 100) / 100,
+    total: totalAmount,
+    total_amount: totalAmount,
+    status: 'unpaid',
   };
 }
 

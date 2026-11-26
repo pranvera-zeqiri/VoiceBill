@@ -3,8 +3,8 @@ import { Screen } from '@/components/Screen';
 import { StatusBadge } from '@/components/statusBadge';
 import { colors, radius } from '@/constants/theme';
 import { useApp } from '@/context/AppContext';
-import { calcTotals, formatDate, formatMoney } from '@/utils/format';
-import { shareInvoice } from '@/utils/share';
+import { calcTotals, formatDate, formatMoney, formatSavedDate, formatTime } from '@/utils/format';
+import { generateAndShareInvoicePdf, shareInvoice } from '@/utils/share';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -42,6 +42,20 @@ export default function InvoiceDetailsScreen() {
       );
     }
   };
+  const exportPdf = async () => {
+    try {
+      await generateAndShareInvoicePdf(
+        invoice,
+        customer?.name ?? invoice.customerName ?? 'Klient',
+        user?.businessName ?? 'VoiceBill'
+      );
+    } catch (error) {
+      Alert.alert(
+        'PDF-ja nuk u krijua',
+        error instanceof Error ? error.message : 'Provo përsëri të ruash PDF-në.'
+      );
+    }
+  };
 
   return (
     <Screen>
@@ -65,7 +79,12 @@ export default function InvoiceDetailsScreen() {
             <StatusBadge status={invoice.status} />
           </View>
           <Text style={styles.customer}>{customer?.name ?? 'Klient'}</Text>
-          <Text style={styles.date}>Data: {formatDate(invoice.date)}</Text>
+          <Text style={styles.date}>
+            Data: {invoice.createdAt ? formatSavedDate(invoice.createdAt) : formatDate(invoice.date)}
+          </Text>
+          <Text style={styles.date}>
+            Ora: {invoice.createdAt ? formatTime(invoice.createdAt) : '--:--'}
+          </Text>
           <Text style={styles.date}>Afati i pagesës: {formatDate(invoice.dueDate)}</Text>
         </View>
 
@@ -92,6 +111,11 @@ export default function InvoiceDetailsScreen() {
           <View style={styles.totalDivider} />
           <TotalRow label="Gjithsej" value={formatMoney(totals.total)} strong />
         </View>
+        <Pressable accessibilityLabel="Ruaj PDF ose dërgo" onPress={() => void exportPdf()} style={styles.pdfButton}>
+          <Feather name="file-text" size={18} color="#FFFFFF" />
+          <Text style={styles.pdfButtonText}>Ruaj PDF / Dërgo</Text>
+          <Feather name="send" size={17} color="#FFFFFF" />
+        </Pressable>
       </ScrollView>
     </Screen>
   );
@@ -156,6 +180,17 @@ const styles = StyleSheet.create({
   totalValue: { color: colors.text, fontSize: 13, fontWeight: '600' },
   totalDivider: { height: 1, backgroundColor: colors.border, marginVertical: 2 },
   strong: { color: colors.text, fontSize: 15, fontWeight: '800' },
+  pdfButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    minHeight: 54,
+    marginTop: 18,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+  },
+  pdfButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   emptyText: { color: colors.textMuted, fontSize: 14 },
 });

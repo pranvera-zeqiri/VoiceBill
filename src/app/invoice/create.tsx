@@ -9,7 +9,7 @@ import { InvoiceItem } from '@/types';
 import { calcTotals, formatMoney, uid } from '@/utils/format';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
     Alert,
     KeyboardAvoidingView,
@@ -46,9 +46,7 @@ export default function CreateInvoiceScreen() {
 
   const vatRate = vatOn ? settings.vatRate : 0;
 
-  useEffect(() => {
-    if (!customerId && customers[0]) setCustomerId(customers[0].id);
-  }, [customerId, customers]);
+  const selectedCustomerId = customerId || paramCustomer || customers[0]?.id || '';
 
   const parsedItems: InvoiceItem[] = useMemo(
     () =>
@@ -70,7 +68,7 @@ export default function CreateInvoiceScreen() {
 
   const save = async (status: 'draft' | 'pending') => {
     if (saving) return;
-    if (!customerId) return Alert.alert('Zgjidh klientin', 'Duhet të zgjedhësh një klient.');
+    if (!selectedCustomerId) return Alert.alert('Zgjidh klientin', 'Duhet të zgjedhësh një klient.');
     const incompleteItem = items.some(
       (item) =>
         item.title.trim() &&
@@ -85,7 +83,7 @@ export default function CreateInvoiceScreen() {
     setSaving(true);
     try {
       const invoice = await addInvoice({
-        customerId,
+        customerId: selectedCustomerId,
         title: title.trim() || parsedItems[0].title,
         items: parsedItems,
         vatRate,
@@ -114,7 +112,7 @@ export default function CreateInvoiceScreen() {
           <Text style={styles.section}>Klienti</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingBottom: 6 }}>
             {customers.map((c) => {
-              const active = c.id === customerId;
+              const active = c.id === selectedCustomerId;
               return (
                 <Pressable
                   key={c.id}

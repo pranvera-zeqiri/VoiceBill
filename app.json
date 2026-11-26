@@ -20,7 +20,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-audio"
+      "expo-audio",
+      "expo-sharing",
+      "expo-sharing",
+      "expo-asset",
+      "expo-image",
+      "expo-splash-screen",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": false
